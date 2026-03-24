@@ -1,0 +1,2 @@
+# claude_setting
+claude
