@@ -1,0 +1,50 @@
+# 敏感檔案 - 絕對不要提交
+*.credentials.json
+.credentials.json
+settings.local.json
+.mcp.json
+
+# 執行時產生的檔案
+history.jsonl
+sessions/
+cache/
+telemetry/
+metrics/
+shell-snapshots/
+paste-cache/
+file-history/
+stats-cache.json
+mcp-needs-auth-cache.json
+
+# ECC plugin（太大，需另外安裝）
+plugins/
+ecc/
+scripts/
+
+# 二進位檔
+*.exe
+*.dll
+*.so
+*.dylib
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 暫存
+*.tmp
+*.bak
+*.swp
+*~
+
+# Logs（project-template 保留 .gitkeep）
+global/logs/
+project-template/logs/*.log
+project-template/logs/*.jsonl
+
+# TaskMaster 資料（每個專案不同）
+project-template/taskmaster-data/*.md
+project-template/taskmaster-data/*.json
+project-template/taskmaster-data/*.jsonl
+project-template/taskmaster-data/.*
