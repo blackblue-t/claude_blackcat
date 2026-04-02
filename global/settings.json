@@ -305,7 +305,8 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bash /c/Users/hanson_chang/.claude/statusline-command.sh"
+    "command": "bash \"$HOME/.claude/statusline-command.sh\"",
+    "padding": 0
   },
   "autoUpdatesChannel": "latest"
 }

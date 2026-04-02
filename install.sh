@@ -115,6 +115,7 @@ fi
 echo ""
 echo "📄 安裝設定檔..."
 install_file "$GLOBAL_SRC/settings.json" "$CLAUDE_DIR/settings.json" "settings.json"
+install_file "$GLOBAL_SRC/statusline-command.sh" "$CLAUDE_DIR/statusline-command.sh" "statusline-command.sh"
 
 echo ""
 echo "╭─────────────────────────────────────────╮"
