@@ -1,6 +1,6 @@
 {
   "env": {
-    "CLAUDE_PLUGIN_ROOT": "C:/Users/hanson_chang/.claude",
+    "CLAUDE_PLUGIN_ROOT": "__CLAUDE_DIR__",
     "MAX_THINKING_TOKENS": "25000",
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "50"
   },
