@@ -7,9 +7,15 @@
 ```bash
 git clone https://github.com/blackblue-t/claude_blackcat.git
 cd claude_blackcat
-bash install.sh          # symlink 模式（推薦，改一處全同步）
-# bash install.sh --copy # 複製模式（各機獨立）
+bash install.sh          # 自動偵測 OS，Windows 自動使用 copy 模式
+# bash install.sh --copy # 強制使用複製模式
 ```
+
+安裝腳本會自動：
+- **偵測作業系統**（Windows / macOS / Linux）
+- **Windows 自動切換 copy 模式**（symlink 需管理員權限）
+- **動態替換路徑**（`CLAUDE_PLUGIN_ROOT` 自動設為當前機器的 `~/.claude`）
+- **檢查 jq 是否安裝**（statusline 必需，未安裝會提示並可一鍵安裝）
 
 ### 安裝後手動設定
 
@@ -17,16 +23,26 @@ bash install.sh          # symlink 模式（推薦，改一處全同步）
 |:--|:--|
 | `settings.local.json` | MCP API keys 等敏感設定（不入 git） |
 | `.mcp.json` | MCP server 配置（每台機器不同） |
-| ECC plugin | 需另外安裝 [everything-claude-code](https://github.com/nicobailey/everything-claude-code) |
-| jq | statusline 需要 jq（Windows: `winget install jqlang.jq`，Linux: `apt install jq`） |
+| ECC plugin | 需另外安裝 [everything-claude-code](https://github.com/affaan-m/everything-claude-code) |
+
+### ECC Plugin 安裝
+
+```bash
+cd /tmp
+git clone https://github.com/affaan-m/everything-claude-code.git
+cd everything-claude-code
+bash install.sh python typescript rust   # 依需求選擇語言
+```
+
+支援語言：python, typescript, javascript, go, rust, java, kotlin, swift, cpp, csharp, php, perl
 
 ## 目錄結構
 
 ```
 claude_blackcat/
-├── install.sh                  # 安裝腳本（symlink / copy）
+├── install.sh                  # 安裝腳本（自動偵測 OS + 動態路徑替換）
 ├── global/                     # → ~/.claude/ 的內容
-│   ├── settings.json           # 全域設定（hooks + statusline + env）
+│   ├── settings.json           # 全域設定模板（__CLAUDE_DIR__ placeholder）
 │   ├── statusline-command.sh   # 多行彩色 statusline（GUNDAM 版）
 │   ├── agents/                 # 17 個 Agent 定義
 │   ├── commands/               # 12 個繁體中文 Slash Commands
@@ -42,6 +58,17 @@ claude_blackcat/
     ├── context/                # 跨 Agent 上下文共享目錄
     ├── taskmaster-data/        # WBS 任務清單和時間追蹤
     └── logs/                   # Agent 活動 log
+```
+
+## 多機器同步
+
+`settings.json` 使用 `__CLAUDE_DIR__` 作為路徑 placeholder，安裝時由 `install.sh` 自動替換為當前機器的實際路徑。不再需要手動修改任何路徑。
+
+```
+新電腦設定流程：
+1. git clone → bash install.sh      （blackcat 設定）
+2. git clone → bash install.sh ...  （ECC plugin）
+3. 手動設定 settings.local.json + .mcp.json
 ```
 
 ## 核心工作流：TaskMaster
@@ -169,6 +196,8 @@ weekly  ●●●●●●●●○○  79% ⟳ 03/23 10:00
 
 特色：RGB 彩色、60 秒 API 快取、跨平台 jq 自動搜尋、OAuth token 自動解析
 
+> **注意**：statusline 需要 `jq`。安裝腳本會自動檢查並提示安裝。
+
 ## Hooks 系統
 
 ### 全域 Hooks（settings.json）
@@ -198,7 +227,7 @@ weekly  ●●●●●●●●○○  79% ⟳ 03/23 10:00
 
 | 來源 | 內容 |
 |:--|:--|
-| [ECC](https://github.com/nicobailey/everything-claude-code) v1.9.0 | agents, hooks, ECC skills, session lifecycle |
+| [ECC](https://github.com/affaan-m/everything-claude-code) v1.10.0 | agents, hooks, ECC skills, session lifecycle |
 | [GUNDAM](https://github.com/kuanweic/claude-GUNDAM-zh-tw) | TaskMaster 工作流, commands, output-styles, statusline, 人機協作 |
 | 個人調整 | MAX_THINKING_TOKENS=25000, Python 優先, SUGGEST_HIGH 預設 |
 
@@ -208,4 +237,11 @@ weekly  ●●●●●●●●○○  79% ⟳ 03/23 10:00
 |:--|:--|:--|
 | `MAX_THINKING_TOKENS` | 25000 | 延伸思考 token 上限（最大 31999） |
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | 50 | 自動壓縮觸發閾值 |
-| `CLAUDE_PLUGIN_ROOT` | ~/.claude | ECC plugin 根目錄 |
+| `CLAUDE_PLUGIN_ROOT` | ~/.claude（安裝時自動設定） | ECC plugin 根目錄 |
+
+## 依賴
+
+| 工具 | 用途 | 安裝方式 |
+|:--|:--|:--|
+| `jq` | statusline JSON 解析 | Windows: `winget install jqlang.jq`、macOS: `brew install jq`、Linux: `apt install jq` |
+| `node` | ECC hooks 執行 | https://nodejs.org |

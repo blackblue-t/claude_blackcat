@@ -1,9 +1,10 @@
 #!/bin/bash
 
 # claude_blackcat 安裝腳本
-# 將 repo 中的設定 symlink 到 ~/.claude/
+# 將 repo 中的設定安裝到 ~/.claude/
 # 用法: bash install.sh [--copy]
 #   --copy: 使用複製而非 symlink（不推薦，無法自動同步）
+#   Windows 環境下自動使用 copy 模式
 
 set -e
 
@@ -12,18 +13,40 @@ CLAUDE_DIR="$HOME/.claude"
 GLOBAL_SRC="$SCRIPT_DIR/global"
 MODE="symlink"
 
+# 自動偵測 OS
+detect_os() {
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*|Windows_NT)
+            echo "windows"
+            ;;
+        Darwin)
+            echo "macos"
+            ;;
+        *)
+            echo "linux"
+            ;;
+    esac
+}
+
+OS_TYPE=$(detect_os)
+
 if [ "$1" = "--copy" ]; then
     MODE="copy"
+elif [ "$OS_TYPE" = "windows" ]; then
+    MODE="copy"
+    echo "⚠️  偵測到 Windows 環境，自動切換為 copy 模式"
 fi
 
 echo "╭─────────────────────────────────────────╮"
 echo "│  claude_blackcat 安裝程式               │"
+echo "│  系統: $OS_TYPE                         │"
 echo "│  模式: $MODE                            │"
 echo "╰─────────────────────────────────────────╯"
 echo ""
 
-# 確保 ~/.claude 存在
+# 確保 ~/.claude 和子目錄存在
 mkdir -p "$CLAUDE_DIR"
+mkdir -p "$CLAUDE_DIR/skills"
 
 # 備份現有設定
 BACKUP_DIR="$CLAUDE_DIR/backups/$(date '+%Y%m%d_%H%M%S')"
@@ -41,15 +64,12 @@ install_dir() {
         return
     fi
 
-    # 備份現有目錄
     if [ -d "$dest" ] && [ ! -L "$dest" ]; then
         cp -r "$dest" "$BACKUP_DIR/$name" 2>/dev/null || true
     fi
 
     if [ "$MODE" = "symlink" ]; then
-        # 移除現有目錄/symlink
         rm -rf "$dest" 2>/dev/null || true
-        # 建立 symlink
         ln -sf "$src" "$dest"
         echo "  🔗 $name → symlink"
     else
@@ -69,7 +89,6 @@ install_file() {
         return
     fi
 
-    # 備份
     if [ -f "$dest" ] && [ ! -L "$dest" ]; then
         cp "$dest" "$BACKUP_DIR/$name" 2>/dev/null || true
     fi
@@ -114,7 +133,20 @@ fi
 
 echo ""
 echo "📄 安裝設定檔..."
-install_file "$GLOBAL_SRC/settings.json" "$CLAUDE_DIR/settings.json" "settings.json"
+
+# settings.json：用 awk 動態替換 __CLAUDE_DIR__ 為當前機器的路徑
+if [ -f "$GLOBAL_SRC/settings.json" ]; then
+    if [ -f "$CLAUDE_DIR/settings.json" ] && [ ! -L "$CLAUDE_DIR/settings.json" ]; then
+        cp "$CLAUDE_DIR/settings.json" "$BACKUP_DIR/settings.json" 2>/dev/null || true
+    fi
+
+    awk -v dir="$CLAUDE_DIR" '{gsub(/__CLAUDE_DIR__/, dir); print}' \
+        "$GLOBAL_SRC/settings.json" > "$CLAUDE_DIR/settings.json"
+    echo "  ✅ settings.json → 已生成（CLAUDE_PLUGIN_ROOT: $CLAUDE_DIR）"
+else
+    echo "  ⏭️  跳過 settings.json（來源不存在）"
+fi
+
 install_file "$GLOBAL_SRC/statusline-command.sh" "$CLAUDE_DIR/statusline-command.sh" "statusline-command.sh"
 
 echo ""
@@ -128,3 +160,35 @@ echo "│  - settings.local.json 需手動設定       │"
 echo "│  - MCP API keys 需手動填入 .mcp.json    │"
 echo "│  - ECC plugin 需另外安裝                │"
 echo "╰─────────────────────────────────────────╯"
+
+# ── jq 檢查（statusline 必需）──────────────────────────
+echo ""
+if command -v jq >/dev/null 2>&1; then
+    echo "✅ jq 已安裝 ($(jq --version))"
+else
+    echo "⚠️  jq 未安裝！statusline 需要 jq 才能正常顯示。"
+    echo ""
+    if [ "$OS_TYPE" = "windows" ]; then
+        echo "   請執行: winget install jqlang.jq"
+    elif [ "$OS_TYPE" = "macos" ]; then
+        echo "   請執行: brew install jq"
+    else
+        echo "   請執行: sudo apt install jq  或  sudo dnf install jq"
+    fi
+    echo ""
+    read -p "   是否現在安裝 jq？(y/N) " install_jq
+    if [ "$install_jq" = "y" ] || [ "$install_jq" = "Y" ]; then
+        if [ "$OS_TYPE" = "windows" ]; then
+            winget install jqlang.jq --accept-package-agreements --accept-source-agreements
+        elif [ "$OS_TYPE" = "macos" ]; then
+            brew install jq
+        else
+            sudo apt install -y jq 2>/dev/null || sudo dnf install -y jq 2>/dev/null || sudo yum install -y jq 2>/dev/null
+        fi
+        if command -v jq >/dev/null 2>&1; then
+            echo "   ✅ jq 安裝成功！"
+        else
+            echo "   ⚠️  安裝後可能需要重開終端才能使用"
+        fi
+    fi
+fi
