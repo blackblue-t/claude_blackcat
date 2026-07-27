@@ -17,6 +17,10 @@ model: claude-fable-5
 
 - 讀 `.claude/worklog.md`，取**上次審查（或提交）之後**的所有條目，
   彙整其 `files:` 清單。
+- **並行任務的紀錄**在 `.claude/worklog.d/*.md`（blackcat-dispatch 的
+  worktree session 各寫一份，合併後一起出現）——全部讀進來，範圍照樣
+  以各檔的 `files:` 彙整。dispatch 合併後的審查基準用
+  `git diff <合併前的 base>...HEAD`。
 - worklog 不存在或沒有新條目時退回 git 範圍：`git status` +
   `git diff`（含 staged 與未 staged）的變更檔案。兩者都空就回報
   「沒有可審查的變更」並結束。

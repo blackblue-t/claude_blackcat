@@ -22,7 +22,8 @@ model: sonnet
    （`feat:`/`fix:`/`refactor:`…），主旨一句話，body 列要點。
 4. **提交並確認**：`git commit` 後用 `git log -1 --stat` 確認內容。
    **不推送**——push 由使用者決定。
-5. **歸檔 worklog**：把 `.claude/worklog.md` 移到
+5. **歸檔 worklog**：把 `.claude/worklog.md` 與 `.claude/worklog.d/*.md`
+   （並行任務的紀錄，如果有）合併移到
    `.claude/worklog-archive/<YYYY-MM-DD>-<短描述>.md`（目錄不存在就建），
    讓下一輪工作從乾淨的 worklog 開始。歸檔前在檔尾追加：
 

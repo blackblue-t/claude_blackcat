@@ -29,6 +29,12 @@ description: 執行程式碼修改任務時，把每個有意義的變更即時�
 - `files:` 一定要列全這條變更動到的檔案——這就是 /review-code 的審查範圍。
 - `verify:` 寫實際跑過的驗證指令與結果；沒驗證就寫 `verify: 未驗證` 並說明原因。
 
+## 並行模式（blackcat-dispatch 的 worktree session）
+
+如果你正在 dispatcher 派發的獨立 worktree 裡執行單一任務（dispatch 的
+提示詞會明說），紀錄寫到 `.claude/worklog.d/<任務slug>.md` 而不是
+`worklog.md`——每個任務一份檔案，合併分支時才不會衝突。格式相同。
+
 ## 與 /review-code、/commit 的接力
 
 - 告一段落後提醒使用者跑 `/review-code`（或使用者主動呼叫）。
