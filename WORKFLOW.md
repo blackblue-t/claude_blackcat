@@ -10,7 +10,8 @@
 | [ponytail](https://github.com/DietrichGebert/ponytail) | YAGNI 決策階梯、最小可行、先復用再手寫 | — |
 | [bheadwei/claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw) | **計畫持久化**（/plan 存檔、/tdd 接續）、**session 記錄含失敗清單** | INDEX.md 索引、WBS 強耦合（目錄本身就是索引；plan 不該依賴 TaskMaster 才能用） |
 | [ECC](https://github.com/affaan-m/everything-claude-code) | 驗證迴圈、語言 reviewer agents（皆為複製的 md 檔，不依賴 plugin） | 全部 25+ 個 hooks（每次 tool call spawn node、flag 系統從未用過、plugin 未裝時整批靜默失敗） |
-| 自己 | 同一概念只留一層（不疊 agent+command+style+skill 四層）、lean/strict 二分 | — |
+| [speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw) / [humanizer](https://github.com/blader/humanizer) | 去 AI 味寫作層（中文台灣用語版 + 英文版，依語言自動分工） | Humanizer-zh（簡體語境，與台灣用語方向矛盾） |
+| 自己 | 同一概念只留一層（不疊 agent+command+style+skill 四層）、lean/strict 二分、writing 疊加層 | — |
 
 ## 核心流程
 
