@@ -104,32 +104,23 @@ install_file() {
 }
 
 echo ""
-echo "📂 安裝目錄..."
+echo "📂 安裝目錄（全域只留：rules + hooks；工作流請用 install-project.sh 裝進各專案）..."
 install_dir "$GLOBAL_SRC/rules" "$CLAUDE_DIR/rules" "rules"
-install_dir "$GLOBAL_SRC/agents" "$CLAUDE_DIR/agents" "agents"
-install_dir "$GLOBAL_SRC/commands" "$CLAUDE_DIR/commands" "commands"
 install_dir "$GLOBAL_SRC/hooks" "$CLAUDE_DIR/hooks" "hooks"
-install_dir "$GLOBAL_SRC/output-styles" "$CLAUDE_DIR/output-styles" "output-styles"
 
+# 清理舊版全域工作流：只移除指向本 repo 的 symlink，不動使用者自己的東西
 echo ""
-echo "📂 安裝 skills（合併模式，不覆蓋 ECC skills）..."
-if [ -d "$GLOBAL_SRC/skills" ]; then
-    for skill_dir in "$GLOBAL_SRC/skills"/*/; do
-        skill_name=$(basename "$skill_dir")
-        dest_dir="$CLAUDE_DIR/skills/$skill_name"
-        if [ ! -d "$dest_dir" ]; then
-            if [ "$MODE" = "symlink" ]; then
-                ln -sf "$skill_dir" "$dest_dir"
-                echo "  🔗 skills/$skill_name → symlink（新增）"
-            else
-                cp -r "$skill_dir" "$dest_dir"
-                echo "  📋 skills/$skill_name → 複製（新增）"
-            fi
-        else
-            echo "  ✅ skills/$skill_name（已存在，保留）"
-        fi
-    done
-fi
+echo "🧹 清理舊版全域工作流 symlinks..."
+for target in "$CLAUDE_DIR/agents" "$CLAUDE_DIR/commands" "$CLAUDE_DIR/output-styles" "$CLAUDE_DIR/skills"/*; do
+    [ -L "$target" ] || continue
+    resolved=$(readlink "$target")
+    case "$resolved" in
+        "$SCRIPT_DIR"/*)
+            rm -f "$target"
+            echo "  🗑️  移除 ${target/#$HOME/\~}（原指向本 repo）"
+            ;;
+    esac
+done
 
 echo ""
 echo "📄 安裝設定檔..."
