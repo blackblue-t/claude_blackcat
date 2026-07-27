@@ -14,6 +14,7 @@
 #   bash install-project.sh <project-path> --rules python    # coding rules (common + language sets)
 #   bash install-project.sh <project-path> --taskmaster # add TaskMaster workflow (project-template)
 #   bash install-project.sh <project-path> --update     # update-only: refresh installed items that changed in this repo
+#   bash install-project.sh <project-path> --models     # re-open the per-stage model picker
 #   bash install-project.sh --list                      # list available items
 #
 # Updates: installed copies are never silently overwritten. Every run ends
@@ -83,7 +84,7 @@ list_items() {
 }
 
 if [ "$1" = "--list" ] || [ -z "$1" ]; then
-    echo "Usage: bash install-project.sh <project-path> [--lean|--strict|--all] [--writing] [--taskmaster] [--rules lang1,lang2 | --no-rules] [--skills a,b] [--commands x,y] [--agents m,n] [--output-styles p,q]"
+    echo "Usage: bash install-project.sh <project-path> [--lean|--strict|--all] [--writing] [--taskmaster] [--rules lang1,lang2 | --no-rules] [--models] [--update] [--skills a,b] [--commands x,y] [--agents m,n] [--output-styles p,q]"
     echo ""
     echo "  --lean     fast-iteration preset: $LEAN_SKILLS (default)"
     echo "  --strict   production preset:     $STRICT_SKILLS"
@@ -106,6 +107,8 @@ WRITING=false
 RULES=""
 NO_RULES=false
 UPDATE_ONLY=false
+MODEL_PICK=false
+FORCE_MODELS=false
 PRESET="lean"
 SKILLS=""
 COMMANDS=""
@@ -122,6 +125,7 @@ while [ $# -gt 0 ]; do
         --rules) RULES="${2//,/ }"; shift ;;
         --no-rules) NO_RULES=true ;;
         --update) UPDATE_ONLY=true ;;
+        --models) FORCE_MODELS=true ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
         --commands) COMMANDS="${2//,/ }"; shift ;;
         --agents) AGENTS="${2//,/ }"; shift ;;
@@ -177,11 +181,107 @@ install_md() {
     mkdir -p "$DEST/$kind"
     cp "$src" "$DEST/$kind/$name.md"
     echo "  [copy] $kind/$name"
+    # A freshly copied model-routed command means this is (part of) a first
+    # install -- offer the model picker below.
+    case "$kind/$name" in
+        commands/plan|commands/review-code|commands/commit) MODEL_PICK=true ;;
+    esac
 }
 
 for c in $COMMANDS; do install_md commands "$c"; done
 for a in $AGENTS; do install_md agents "$a"; done
 for o in $STYLES; do install_md output-styles "$o"; done
+
+# --------------------------------------------------------------- models ----
+# First-install model picker: probe whether claude-fable-5 is usable, then
+# ask which model each stage should run on. Choices are written into THIS
+# project's command copies (and optionally .claude/settings.json), so every
+# project can route differently. Re-runs skip it (files already existed);
+# re-open it any time with --models. Non-interactive runs keep the repo
+# defaults (plan/review: claude-fable-5, commit: sonnet).
+
+probe_fable() {
+    command -v claude >/dev/null 2>&1 || return 2
+    if command -v timeout >/dev/null 2>&1; then
+        timeout 45 claude --model claude-fable-5 -p "ok" >/dev/null 2>&1
+    else
+        claude --model claude-fable-5 -p "ok" >/dev/null 2>&1
+    fi
+}
+
+model_from_choice() { # $1=answer $2=default
+    case "$1" in
+        "") echo "$2" ;;
+        1)  echo "claude-fable-5" ;;
+        2)  echo "opus" ;;
+        3)  echo "sonnet" ;;
+        4)  echo "haiku" ;;
+        *)  echo "$1" ;;
+    esac
+}
+
+set_cmd_model() { # $1=command basename $2=model
+    local f="$DEST/commands/$1.md"
+    [ -f "$f" ] || return 0
+    if grep -q '^model: ' "$f"; then
+        sed -i "s/^model: .*/model: $2/" "$f"
+        echo "  [model] commands/$1 -> $2"
+    else
+        echo "  [note] commands/$1.md has no model: line -- edit it manually"
+    fi
+}
+
+if [ "$UPDATE_ONLY" != true ] && [ -t 0 ] && { [ "$MODEL_PICK" = true ] || [ "$FORCE_MODELS" = true ]; }; then
+    echo ""
+    echo "[models] Per-stage model routing for this project."
+    printf "  Probing claude-fable-5 availability (one tiny API call via claude CLI)... "
+    if probe_fable; then
+        FABLE_ST="available"
+    elif [ $? -eq 2 ]; then
+        FABLE_ST="unknown (claude CLI not found; cannot verify)"
+    else
+        FABLE_ST="NOT available"
+    fi
+    echo "$FABLE_ST"
+    DEF_PLAN="claude-fable-5"
+    DEF_REVIEW="claude-fable-5"
+    DEF_COMMIT="sonnet"
+    if [ "$FABLE_ST" = "NOT available" ]; then
+        DEF_PLAN="opus"
+        DEF_REVIEW="opus"
+        echo "  Falling back: plan/review defaults changed to opus."
+    fi
+    echo "  Choices: 1=claude-fable-5  2=opus  3=sonnet  4=haiku"
+    echo "  (Enter keeps the default; you can also type a full model id)"
+    printf "  plan    - /plan strategic planning     [default: %s]: " "$DEF_PLAN"
+    read -r a || a=""
+    M_PLAN="$(model_from_choice "$a" "$DEF_PLAN")"
+    printf "  review  - /review-code code review     [default: %s]: " "$DEF_REVIEW"
+    read -r a || a=""
+    M_REVIEW="$(model_from_choice "$a" "$DEF_REVIEW")"
+    printf "  commit  - /commit mechanical finish    [default: %s]: " "$DEF_COMMIT"
+    read -r a || a=""
+    M_COMMIT="$(model_from_choice "$a" "$DEF_COMMIT")"
+    printf "  execute - main-loop model              [Enter=keep global setting]: "
+    read -r a || a=""
+    M_EXEC="$(model_from_choice "$a" "")"
+
+    set_cmd_model plan "$M_PLAN"
+    set_cmd_model review-code "$M_REVIEW"
+    set_cmd_model commit "$M_COMMIT"
+    if [ -n "$M_EXEC" ]; then
+        SET_FILE="$DEST/settings.json"
+        if [ ! -f "$SET_FILE" ]; then
+            printf '{\n  "model": "%s"\n}\n' "$M_EXEC" > "$SET_FILE"
+            echo "  [model] settings.json (created) -> $M_EXEC"
+        elif grep -q '"model"' "$SET_FILE"; then
+            sed -i "s/\"model\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"model\": \"$M_EXEC\"/" "$SET_FILE"
+            echo "  [model] settings.json -> $M_EXEC"
+        else
+            echo "  [note] settings.json exists without a model key -- add \"model\": \"$M_EXEC\" manually"
+        fi
+    fi
+fi
 
 # ---------------------------------------------------------------- rules ----
 # Claude Code does not auto-load rules directories. Rule files only reach
@@ -357,7 +457,10 @@ for kind in commands agents output-styles; do
         name="$(basename "$f")"
         src="$SCRIPT_DIR/$kind/$name"
         [ -f "$src" ] || continue
-        cmp -s "$src" "$f" || UPDATE_LIST="$UPDATE_LIST $kind/$name"
+        # The frontmatter model line is a per-project choice (see the model
+        # picker above) -- a difference there alone is not an update.
+        cmp -s <(grep -v '^model: ' "$src") <(grep -v '^model: ' "$f") \
+            || UPDATE_LIST="$UPDATE_LIST $kind/$name"
     done
 done
 
@@ -367,7 +470,13 @@ do_update() {
         rm -rf "$dst"
         cp -r "$src" "$dst"
     else
+        # Preserve the project's chosen frontmatter model across updates.
+        local keep_model=""
+        [ -f "$dst" ] && keep_model="$(grep -m1 '^model: ' "$dst" || true)"
         cp "$src" "$dst"
+        if [ -n "$keep_model" ] && grep -q '^model: ' "$dst"; then
+            sed -i "s/^model: .*/$keep_model/" "$dst"
+        fi
     fi
     echo "  [update] $1"
     case "$1" in rules/*)

@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.11**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.12**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -70,7 +70,11 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 ### 模型路由
 
-三段分工：**規劃/審查用 Fable 5、執行用 Opus、機械收尾用 Sonnet**。模型設定集中在三個位置，要調整（例如未來降級成「規劃 Opus、執行 Sonnet」）只改這幾個值再 `blackcat --update` 同步各專案：
+三段分工：**規劃/審查用 Fable 5、執行用 Opus、機械收尾用 Sonnet**。
+
+**初始化精靈**：專案**第一次**安裝時（模型路由指令剛被複製進去），安裝器會自動跑模型設定精靈——先用 claude CLI 探測 `claude-fable-5` 是否可用（一次極小的 API 呼叫；不可用時 plan/review 預設自動降為 opus），然後逐階段詢問 plan / review / commit / 主迴圈各用哪個模型（Enter 保留預設、可輸入 1-4 或完整模型 ID）。選擇寫進**該專案的**指令副本與 `.claude/settings.json`，所以每個專案可以路由不同。重跑不會再問；想改用 `blackcat --models` 重開精靈。專案自選的模型受更新機制保護：比對時忽略 model 行、更新時保留專案的選擇。
+
+repo 端的預設值集中在這幾個位置，要整批調整（例如未來降級成「規劃 Opus、執行 Sonnet」）改這幾個值再 `blackcat --update` 同步各專案：
 
 | 位置 | 現值 | 管什麼 |
 |:--|:--|:--|
@@ -268,6 +272,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.12** | 2026-07-27 | 專案初始化模型精靈：首裝自動探測 Fable 5 可用性（不可用降回 opus）並逐階段詢問 plan/review/commit/主迴圈模型；`--models` 重開精靈；更新機制忽略並保留專案自選 model |
 | **v26.7.11** | 2026-07-27 | 模型路由：/plan 與 /review-code 用 Fable 5、主迴圈 Opus、/commit（新指令）用 Sonnet；新增 worklog skill 讓執行紀錄接力給審查（review 只看 worklog 範圍不掃全庫）；兩者進 lean/strict preset |
 | **v26.7.10** | 2026-07-27 | 新增更新機制：每次 `blackcat` 結尾比對已裝項目與 repo 版本、互動詢問要更新哪些；`blackcat --update` 純更新模式一次刷新全部差異 |
 | **v26.7.9** | 2026-07-27 | 規範改互動選裝：`blackcat` 安裝結尾跳出規範選單（語言組合 + 9 條 common 各附一句說明，可逐條挑）；新增 `--no-rules`；非互動環境自動跳過 |
