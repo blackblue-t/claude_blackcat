@@ -2,14 +2,24 @@
 chcp 65001 >nul
 cd /d "%~dp0"
 
-where bash >nul 2>nul
-if errorlevel 1 (
-    echo [ERROR] 找不到 bash。請先安裝 Git for Windows: https://git-scm.com/download/win
+rem 尋找 Git Bash。不能用 where bash：System32 的 bash.exe 是 WSL 的入口，
+rem 沒裝 WSL 發佈版時會報「沒有已安裝的發佈」。
+set "GITBASH="
+if exist "%ProgramFiles%\Git\bin\bash.exe" set "GITBASH=%ProgramFiles%\Git\bin\bash.exe"
+if not defined GITBASH if exist "%ProgramFiles(x86)%\Git\bin\bash.exe" set "GITBASH=%ProgramFiles(x86)%\Git\bin\bash.exe"
+if not defined GITBASH if exist "%LocalAppData%\Programs\Git\bin\bash.exe" set "GITBASH=%LocalAppData%\Programs\Git\bin\bash.exe"
+if not defined GITBASH for /f "delims=" %%G in ('where git 2^>nul') do if not defined GITBASH if exist "%%~dpG..\bin\bash.exe" set "GITBASH=%%~dpG..\bin\bash.exe"
+
+if not defined GITBASH (
+    echo [ERROR] 找不到 Git Bash。請先安裝 Git for Windows: https://git-scm.com/download/win
+    echo         注意：System32 的 bash.exe 是 WSL，不適用本安裝。
     pause
     exit /b 1
 )
+echo 使用 Git Bash: %GITBASH%
+echo.
 
-bash install.sh
+"%GITBASH%" install.sh
 if errorlevel 1 (
     echo [ERROR] 安裝失敗，請看上方訊息
     pause
