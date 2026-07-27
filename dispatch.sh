@@ -19,12 +19,16 @@
 # Config (.claude/dispatch.conf, shell syntax):
 #   MAX_PARALLEL=2            # max concurrent sessions (default 2)
 #   DISPATCH_MODEL=opus       # default model for task sessions
-#   DISPATCH_PERMISSIONS=acceptEdits   # or: skip
-#     acceptEdits: file edits auto-approved; Bash commands still need
-#       project-level permission allowlists (git commit may be blocked
-#       unless the project allows it -- see README)
-#     skip: --dangerously-skip-permissions; full autonomy INSIDE the
-#       worktree. More capable, use only in projects you trust.
+#   DISPATCH_PERMISSIONS=skip # or: acceptEdits
+#     skip (default): --dangerously-skip-permissions. Full autonomy inside
+#       the worktree. Field-tested rationale: acceptEdits blocks running
+#       verification commands, git add/commit, and .claude/ writes, so
+#       honest agents deadlock in status: pending and the dispatcher never
+#       returns. The real safety gates are elsewhere: file-scope rule in
+#       the task, review gate before main, and no push ever.
+#     acceptEdits: file edits auto-approved but command execution blocked
+#       unless the project allowlists it. Only for untrusted projects;
+#       expect tasks to stall unless allowlists cover the verify commands.
 #
 # Task file format (.claude/tasks/<slug>.md), written by /plan:
 #   ---
@@ -50,7 +54,7 @@ LOG_DIR="$PROJ/.claude/dispatch-logs"
 
 MAX_PARALLEL=2
 DISPATCH_MODEL="opus"
-DISPATCH_PERMISSIONS="acceptEdits"
+DISPATCH_PERMISSIONS="skip"
 [ -f "$CONF" ] && . "$CONF"
 
 MODE="run"
@@ -106,7 +110,11 @@ branch_done() { # non-empty commits on task branch beyond base
 
 # ---------------------------------------------------------------- status ----
 if [ "$MODE" = "status" ]; then
-    echo "[status] base branch: $BASE_BRANCH / max parallel: $MAX_PARALLEL"
+    echo "[status] base branch: $BASE_BRANCH / configured max: $MAX_PARALLEL (conf/default)"
+    if [ -f "$LOG_DIR/last-run.info" ]; then
+        echo "[status] last run actual values:"
+        sed 's/^/    /' "$LOG_DIR/last-run.info"
+    fi
     [ -d "$TASKS_DIR" ] || { echo "  no .claude/tasks/ directory"; exit 0; }
     for t in "$TASKS_DIR"/*.md; do
         [ -f "$t" ] || continue
@@ -170,19 +178,6 @@ fi
 command -v claude >/dev/null 2>&1 || {
     echo "[error] claude CLI not found on PATH"; exit 1; }
 
-# Never dispatch straight off main/master: tasks would merge into main
-# BEFORE review. Create an integration branch instead -- review happens
-# there, and /commit merges it back into main only after verdict: pass.
-if [ "$BASE_BRANCH" = "main" ] || [ "$BASE_BRANCH" = "master" ]; then
-    INT_BRANCH="integrate/$(date +%Y%m%d-%H%M%S)"
-    git -C "$PROJ" switch -c "$INT_BRANCH" >/dev/null 2>&1 || {
-        echo "[error] could not create integration branch $INT_BRANCH"; exit 1; }
-    echo "[branch] on $BASE_BRANCH -- created integration branch $INT_BRANCH"
-    echo "         (tasks branch from and merge back into it; $BASE_BRANCH stays"
-    echo "         clean until /review-code passes and /commit merges it back)"
-    BASE_BRANCH="$INT_BRANCH"
-fi
-
 TASKS="$(pending_tasks)"
 if [ -z "$TASKS" ]; then
     echo "[run] no pending tasks in .claude/tasks/ -- generate them with /plan first"
@@ -193,7 +188,21 @@ COUNT=$(echo "$TASKS" | wc -l)
 echo "[run] $COUNT pending task(s), max $MAX_PARALLEL concurrent, model default: $DISPATCH_MODEL"
 echo "      permissions: $DISPATCH_PERMISSIONS / base: $BASE_BRANCH"
 
+# Never dispatch straight off main/master: tasks would merge into main
+# BEFORE review. An integration branch is created instead -- review happens
+# there, and /commit merges it back into main only after verdict: pass.
+NEED_INT=false
+if [ "$BASE_BRANCH" = "main" ] || [ "$BASE_BRANCH" = "master" ]; then
+    NEED_INT=true
+fi
+
 if [ "$DRY" = true ]; then
+    # dry-run is strictly read-only: no branch creation, no HEAD switch.
+    if [ "$NEED_INT" = true ]; then
+        echo "  [note] on $BASE_BRANCH: a real run would first create integration"
+        echo "         branch integrate/<timestamp> and switch to it ($BASE_BRANCH"
+        echo "         stays clean until /review-code passes and /commit merges back)"
+    fi
     for t in $TASKS; do
         slug="$(basename "$t" .md)"
         m="$(task_meta "$t" model)"; [ -n "$m" ] || m="$DISPATCH_MODEL"
@@ -202,10 +211,36 @@ if [ "$DRY" = true ]; then
     exit 0
 fi
 
-PERM_FLAGS="--permission-mode acceptEdits"
-[ "$DISPATCH_PERMISSIONS" = "skip" ] && PERM_FLAGS="--dangerously-skip-permissions"
+if [ "$NEED_INT" = true ]; then
+    INT_BRANCH="integrate/$(date +%Y%m%d-%H%M%S)"
+    git -C "$PROJ" switch -c "$INT_BRANCH" >/dev/null 2>&1 || {
+        echo "[error] could not create integration branch $INT_BRANCH"; exit 1; }
+    echo "[branch] on $BASE_BRANCH -- created integration branch $INT_BRANCH"
+    echo "         (tasks branch from and merge back into it; $BASE_BRANCH stays"
+    echo "         clean until /review-code passes and /commit merges it back)"
+    BASE_BRANCH="$INT_BRANCH"
+fi
+
+if [ "$DISPATCH_PERMISSIONS" = "skip" ]; then
+    PERM_FLAGS="--dangerously-skip-permissions"
+    echo "[perm] skip: sessions run fully autonomous inside their worktrees"
+    echo "       (safety gates: task file-scope rule, review gate, no push)"
+else
+    PERM_FLAGS="--permission-mode acceptEdits"
+    echo "[perm] WARNING: acceptEdits blocks command execution (verify commands,"
+    echo "       git add/commit, .claude/ writes) unless the project allowlists"
+    echo "       them -- tasks may deadlock in pending. Set"
+    echo "       DISPATCH_PERMISSIONS=skip in .claude/dispatch.conf for autonomy."
+fi
 
 mkdir -p "$LOG_DIR" "$WT_ROOT"
+{
+    echo "started: $(date '+%F %T')"
+    echo "max: $MAX_PARALLEL"
+    echo "model-default: $DISPATCH_MODEL"
+    echo "permissions: $DISPATCH_PERMISSIONS"
+    echo "base: $BASE_BRANCH"
+} > "$LOG_DIR/last-run.info"
 
 launch_task() { # $1=task file
     local t="$1"

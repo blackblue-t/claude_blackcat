@@ -14,9 +14,10 @@ staging、commit message、合併回主分支（並行路線）、歸檔——�
 - **一般路線**：主 session 直接實作，變更還在 working tree 未提交
   → 走完整流程（步驟 1-5），若在分支上最後做步驟 6。
 - **並行路線**（blackcat-dispatch）：工作**已經**在任務分支 commit 並
-  合進整合分支（`integrate/*` 或 feature 分支），working tree 乾淨
-  → 跳過步驟 2-4（沒有東西要 commit；審查修復除外），重點是步驟 6
-  **合併回 main**。
+  合進整合分支（`integrate/*` 或 feature 分支）。若 working tree 乾淨
+  → 跳過步驟 2-4，直接步驟 6 **合併回 main**。若有**審查修復**
+  （worklog 有 `## Fix:` 條目、tree 不乾淨）→ 先做步驟 5.5 把修復
+  commit 在整合分支上，再走步驟 6。
 
 ## 流程
 
@@ -42,6 +43,11 @@ staging、commit message、合併回主分支（並行路線）、歸檔——�
    - hash: <short hash>
    - message: <主旨>
    ```
+
+5.5 **提交審查修復**（並行路線、有 `## Fix:` 條目時）：只 stage Fix
+   條目 `files:` 列出的檔案，在整合分支上 commit（訊息如
+   `fix: review round N fixes`）——修復歷史留在整合分支，main 拿到
+   完整的一包。
 
 6. **合併回主分支**（在整合分支或 feature 分支上時）：
    - 確認主分支名（`main` 或 `master`，看 `git branch`）。

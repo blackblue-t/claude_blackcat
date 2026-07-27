@@ -1,6 +1,6 @@
 ---
 name: worklog
-description: 執行程式碼修改任務時，把每個有意義的變更即時記錄到 .claude/worklog.md，作為 /review-code 的審查範圍與 /commit 的提交依據。觸發時機：任何會新增或修改程式碼檔案的實作任務（寫功能、修 bug、重構）。不要觸發：純問答、讀碼分析、規劃討論。
+description: MUST BE USED whenever writing or modifying code files in this project（寫功能、修 bug、重構、審查修復都算）。把每個有意義的變更即時記錄到 .claude/worklog.md，作為 /review-code 的審查範圍與 /commit 的提交依據——沒有紀錄，後續的審查與提交流程會直接斷掉。在動手改第一個檔案之前就要啟用。不要觸發：純問答、讀碼分析、規劃討論。
 ---
 
 # Worklog：執行紀錄

@@ -10,6 +10,18 @@ model: sonnet
 把 `/plan` 匯出的 `.claude/tasks/*.md` 交給 `blackcat-dispatch` 並行執行。
 你（Claude）負責跑指令、盯進度、把結果整理給使用者。
 
+## 先搞懂：合併有兩層（別誤判順序）
+
+```
+第 1 層  /dispatch --merge   任務分支 → 整合分支 integrate/*（main 完全不動）
+第 2 層  /commit             整合分支 → main（僅在 /review-code pass 之後）
+```
+
+從 main/master 出發的真跑會**自動建立整合分支並切換 HEAD**（dry-run 不會，
+只提示）。所以**相對於 main，順序是 review → merge**——`--merge` 合的只是
+中繼站。跟使用者說明狀態時務必講清楚這兩層。合併沒有獨立的 `/merge`？有——
+它就是本指令 `--merge` 的薄包裝。
+
 參數直通：`$ARGUMENTS` 原樣傳給 `blackcat-dispatch`
 （例：`/dispatch --dry-run`、`/dispatch --max 3`、`/dispatch --merge`、
 `/dispatch --status`、`/dispatch --clean`）。
@@ -19,11 +31,19 @@ model: sonnet
 1. **前置檢查**：
    - `command -v blackcat-dispatch`——找不到就請使用者重跑全域安裝
      （blackcat repo 的 `install.bat` / `install.sh`），不要自己找路徑硬跑。
+   - **權限模式**：看 `.claude/dispatch.conf` 的 `DISPATCH_PERMISSIONS`
+     （沒設 = 預設 `skip`，可全自動）。若是 `acceptEdits`，警告使用者：
+     headless session 將無法執行驗證指令與 git commit（實測會讓任務
+     全部卡死在 pending），除非專案 permissions 有放行——請確認或改 conf。
    - 無參數（= 要執行任務）時先跑一次 `blackcat-dispatch --dry-run`
      給使用者看會啟動哪些任務、預設併發數，**確認後才真正執行**。
 2. **執行**：`blackcat-dispatch $ARGUMENTS`。
    - 執行模式（無參數或只有 --max）耗時較長：用背景執行，期間每
      30-60 秒跑 `blackcat-dispatch --status` 回報一次進度，不要傻等。
+   - **進度判讀紀律**（實測教訓）：執行中的觀察只能當線索、不能當結論
+     ——log 在結束前是不完整的緩衝、`git status` 會抓到 agent 的暫存檔。
+     實際執行參數以**啟動時的 stdout** 與 `--status` 的
+     `last run actual values` 為準。等 session 結束讀完整 log 再下判斷。
    - `--dry-run` / `--status` / `--merge` / `--clean` 都很快，直接前景跑。
 3. **報告**：
    - 執行完成：整理每個任務 done/FAIL；FAIL 的把

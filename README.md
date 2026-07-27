@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.17**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.18**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -88,6 +88,8 @@ repo 端的預設值集中在這幾個位置，要整批調整（例如未來降
 執行 → 審查 → 提交靠 **worklog 接力**：執行時 worklog skill 把每個變更（動了哪些檔、做了什麼、驗證結果）追加到專案的 `.claude/worklog.md`；`/review-code` **只讀 worklog + 列出檔案的 git diff**（不掃全專案，Fable 的錢花在刀口上），結論寫回 worklog；`verdict: pass` 後 `/commit` 用 Sonnet 只 stage 紀錄過的檔案、寫 commit message、提交並歸檔 worklog。worklog skill 與 `/commit` 已加入 lean/strict 兩個 preset。
 
 > Fable 5 是 Opus 之上的模型級別、單價較高，所以只配給規劃與審查；用之前先在 CLI 打 `/model` 確認你的方案看得到 `claude-fable-5`，看不到就把兩個 frontmatter 降回 `opus`。
+>
+> **驗證路由是否生效**：別問模型「你是誰」——session 系統提示詞不隨斜線指令的 `model:` 更新，自報不可靠（實測結論）。要驗就用外部觀測：`/status`、API 用量紀錄，或 dispatcher stdout 的模型回顯（任務層 `model:` 已實測確證生效）。
 
 ### 完整開發流程（含並行執行）
 
@@ -120,7 +122,12 @@ bcd --merge         # 合併完成的任務分支（衝突會停下指路）
 bcd --clean         # 移除 worktree、刪已合併分支
 ```
 
-**併發上限**三個層級：`--max N` 單次生效 → 加 `--save` 寫入專案 `.claude/dispatch.conf`（`MAX_PARALLEL=N`，之後預設沿用）→ 都沒設預設 2。conf 還可設 `DISPATCH_MODEL`（任務預設模型，個別任務檔可用 `model:` 覆蓋）與 `DISPATCH_PERMISSIONS`（`acceptEdits` 預設：自動核准檔案編輯，但 git commit 等 Bash 指令要靠專案 permissions 允許；`skip` = `--dangerously-skip-permissions`，worktree 內全自動，只在信任的專案用）。
+**併發上限**三個層級：`--max N` 單次生效 → 加 `--save` 寫入專案 `.claude/dispatch.conf`（`MAX_PARALLEL=N`，之後預設沿用）→ 都沒設預設 2。實際執行參數記錄在 `--status` 的 `last run actual values`（設定值與執行值分開顯示）。conf 還可設 `DISPATCH_MODEL`（任務預設模型，個別任務檔 `model:` 可覆蓋）與 `DISPATCH_PERMISSIONS`：
+
+- **`skip`（預設）**= `--dangerously-skip-permissions`，worktree 內全自動。端到端實測的結論：`acceptEdits` 會擋掉驗證指令、`git commit` 和 `.claude/` 寫入，誠實的 agent 全數卡死在 pending、dispatcher 永不返回。真正的安全閘門在流程裡——任務檔案範圍鐵則、review gate、永不 push——不在權限模式。
+- `acceptEdits`：只給不信任的場景,並預期任務會卡住,除非專案 permissions 放行驗證指令。
+
+**審查修復迴圈**（needs-fix 之後）：審查者（Fable）給每個 finding 標級——`fix`（不動介面/資料格式/依賴/需求 → **主 session 修**,修的人與審的人分離）、`design`（回 /plan）、`requirement`（回 /grill）；有高層級 finding 整輪不修小的。修完做**限縮重審**（只看 finding + Fix 條目 + 修復 diff）,上限 2 輪,過不了就升級給使用者裁決。修復由 `/commit` 在整合分支上先行提交再合併回 main。
 
 **安全設計**：任務由 /plan 匯出時強制檔案不重疊、內容自足（headless session 沒有對話上下文）；每個 session 只寫自己的 `.claude/worklog.d/<slug>.md`（合併不衝突）；只 commit 不 push 不 merge；失敗的任務留 log 在 `.claude/dispatch-logs/`。
 
@@ -326,6 +333,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.18** | 2026-07-28 | 依端到端實測修正：dispatcher 權限預設改 skip（acceptEdits 實測卡死）、dry-run 真唯讀、--status 增列實際執行值；新增審查修復迴圈（finding 分級 fix/design/requirement、主 session 修、限縮重審、2 輪上限）；任務模板加完成程序與 Windows 注意事項；/merge 薄包裝；grill 交接指紋 |
 | **v26.7.17** | 2026-07-27 | 修並行路線收尾：dispatch 從 main 出發自動開 `integrate/*` 整合分支（main 審查前保持乾淨）；/commit 增加並行模式——驗 pass 後把整合分支 merge --no-ff 回 main |
 | **v26.7.16** | 2026-07-27 | 調度改雙入口：新增 `/dispatch` slash command（Claude Code 內用，dry-run 確認、背景執行定期回報、衝突協助）與終端短別名 `bcd`；/dispatch 進 preset |
 | **v26.7.15** | 2026-07-27 | 完整流程落地：新增 /grill（Fable 需求拷問）、/plan 並行任務匯出、`blackcat-dispatch`（worktree 隔離 + headless 並行執行，`--max` 控併發、merge/clean/status 子模式）；worklog.d 並行紀錄機制 |
