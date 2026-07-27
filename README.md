@@ -46,12 +46,16 @@ bash install.sh          # 自動偵測 OS，Windows 自動使用 copy 模式
 
 ```bash
 cd claude_blackcat
-bash install-project.sh --list                    # 看有什麼可裝
-bash install-project.sh ~/code/my-project         # 精選核心：ponytail(-review) + tdd-workflow + verification-loop + /plan /tdd /verify /review-code
-bash install-project.sh ~/code/my-project --all   # 全部
+bash install-project.sh --list                      # 看有什麼可裝
+bash install-project.sh ~/code/my-project           # 預設 --lean
+bash install-project.sh ~/code/my-project --lean    # 快速迭代：ponytail + ponytail-review + /plan /review-code
+bash install-project.sh ~/code/my-project --strict  # 正式產品：tdd-workflow + verification-loop + /plan /tdd /verify /review-code
+bash install-project.sh ~/code/my-project --all     # 全部
 bash install-project.sh ~/code/my-project --skills django-tdd,django-patterns --agents python-reviewer
 bash install-project.sh ~/code/my-project --taskmaster   # 加裝 TaskMaster 工作流
 ```
+
+> `--lean` 和 `--strict` 刻意分開：ponytail 的「測試留最小 check」和 tdd-workflow 的「強制 80% 覆蓋率」都在任何 coding 任務觸發，同裝會互相矛盾。要混用請自行 `--skills` 指定。
 
 裝完把專案的 `.claude/` 提交進該專案的 git。之後要客製直接改專案內的檔案。
 
@@ -96,7 +100,7 @@ GUNDAM 版多行彩色 statusline（模型 │ context │ 目錄+branch │ 時
 
 | 變數 | 值 | 用途 |
 |:--|:--|:--|
-| `MAX_THINKING_TOKENS` | 8000 | 延伸思考 token 上限 |
+| `MAX_THINKING_TOKENS` | 10000 | 延伸思考 token 上限 |
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | 50 | 自動壓縮觸發閾值 |
 | `CLAUDE_PLUGIN_ROOT` | ~/.claude（安裝時自動設定） | ECC plugin 根目錄 |
 

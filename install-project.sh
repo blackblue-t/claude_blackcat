@@ -5,20 +5,27 @@
 # （複製而非 symlink：進了專案就屬於專案，可以針對專案自行修改 — 參考 mattpocock/skills 的做法）
 #
 # 用法:
-#   bash install-project.sh <專案路徑>                        # 安裝精選核心組合
+#   bash install-project.sh <專案路徑> --lean                 # 快速迭代：ponytail 系（YAGNI 最小可行）
+#   bash install-project.sh <專案路徑> --strict               # 正式產品：tdd-workflow + verification-loop
 #   bash install-project.sh <專案路徑> --all                  # 安裝全部
 #   bash install-project.sh <專案路徑> --skills a,b --commands x,y --agents m,n
 #   bash install-project.sh <專案路徑> --taskmaster           # 加裝 TaskMaster 工作流（project-template）
 #   bash install-project.sh --list                            # 列出可安裝項目
+#
+# 不帶 preset 時預設 --lean。
+# lean 和 strict 刻意分開：ponytail（測試留最小 check 就好）和 tdd-workflow
+# （強制先寫測試 + 80% 覆蓋率）的觸發條件都是「任何 coding 任務」，同時安裝
+# 會給模型互相矛盾的指令。真的要混用請自行 --skills 明確指定。
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 精選核心組合（不帶參數時的預設）
-CORE_SKILLS="ponytail ponytail-review tdd-workflow verification-loop"
-CORE_COMMANDS="plan tdd verify review-code"
-CORE_AGENTS=""
+# preset 組合
+LEAN_SKILLS="ponytail ponytail-review"
+LEAN_COMMANDS="plan review-code"
+STRICT_SKILLS="tdd-workflow verification-loop"
+STRICT_COMMANDS="plan tdd verify review-code"
 
 list_items() {
     local kind
@@ -36,7 +43,10 @@ list_items() {
 }
 
 if [ "$1" = "--list" ] || [ -z "$1" ]; then
-    echo "用法: bash install-project.sh <專案路徑> [--all|--taskmaster|--skills a,b|--commands x,y|--agents m,n|--output-styles p,q]"
+    echo "用法: bash install-project.sh <專案路徑> [--lean|--strict|--all] [--taskmaster] [--skills a,b] [--commands x,y] [--agents m,n] [--output-styles p,q]"
+    echo ""
+    echo "  --lean    快速迭代 preset：$LEAN_SKILLS（預設）"
+    echo "  --strict  正式產品 preset：$STRICT_SKILLS"
     echo ""
     list_items
     exit 0
@@ -51,14 +61,17 @@ DEST="$TARGET/.claude"
 
 ALL=false
 TASKMASTER=false
-SKILLS="$CORE_SKILLS"
-COMMANDS="$CORE_COMMANDS"
-AGENTS="$CORE_AGENTS"
+PRESET="lean"
+SKILLS=""
+COMMANDS=""
+AGENTS=""
 STYLES=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --all) ALL=true ;;
+        --lean) PRESET="lean" ;;
+        --strict) PRESET="strict" ;;
         --taskmaster) TASKMASTER=true ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
         --commands) COMMANDS="${2//,/ }"; shift ;;
@@ -74,6 +87,15 @@ if [ "$ALL" = true ]; then
     COMMANDS=$(ls "$SCRIPT_DIR/commands" | sed 's/\.md$//')
     AGENTS=$(ls "$SCRIPT_DIR/agents" | sed 's/\.md$//')
     STYLES=$(ls "$SCRIPT_DIR/output-styles" | grep '\.md$' | sed 's/\.md$//')
+else
+    # 沒用 --skills/--commands 明確指定的部分，套用 preset
+    if [ -z "$SKILLS" ]; then
+        [ "$PRESET" = "strict" ] && SKILLS="$STRICT_SKILLS" || SKILLS="$LEAN_SKILLS"
+    fi
+    if [ -z "$COMMANDS" ]; then
+        [ "$PRESET" = "strict" ] && COMMANDS="$STRICT_COMMANDS" || COMMANDS="$LEAN_COMMANDS"
+    fi
+    echo "🎛️  preset: $PRESET"
 fi
 
 mkdir -p "$DEST"
