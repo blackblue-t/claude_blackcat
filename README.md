@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.4**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.6**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -32,22 +32,28 @@ cd claude_blackcat
 bash install.sh     # 建立 blackcat 指令；把 ~/.claude/bin 加進 PATH
 ```
 
-會自動清掉舊版指向本 repo 的全域工作流 symlinks。安裝後手動設定：`settings.local.json`（API keys）、`.mcp.json`（每台機器不同）。**不需要安裝 ECC plugin**。
+安裝前會**先清後裝**：把舊版本 repo 裝進 `~/.claude` 的項目（agents、commands、output-styles、rules、hooks、repo 提供的 skills——不論 symlink 或複製的實體目錄）備份到 `~/.claude/backups/<時間戳>/` 後移除。**不會動到**：credentials、projects/、settings.local.json、`.mcp.json`、CLAUDE.md、非本 repo 的 skills（如 ECC 裝的）。安裝腳本輸出全為英文（cmd 對 UTF-8 中文的解析有已知 bug）。
+
+安裝後手動設定：`settings.local.json`（API keys）、`.mcp.json`（每台機器不同）。**不需要安裝 ECC plugin**。
 
 ### 專案（在專案目錄一行搞定）
 
 全域裝完後，`cd` 到任何專案目錄：
 
+主指令是 **`blackcat`**，四個環境（cmd / PowerShell / macOS / Linux）打同一個字：
+
 ```bat
-cat --lean       :: 快速迭代工作流（Windows cmd；macOS/Linux 用 blackcat --lean）
-cat --strict     :: 正式產品工作流
-cat --writing    :: 疊加寫作組合（可配任一 preset）
-cat --taskmaster :: 加裝 TaskMaster
-cat --list       :: 看全部選項
-cat --skills django-tdd --agents python-reviewer   :: 手動指定
+blackcat --lean       :: 快速迭代工作流
+blackcat --strict     :: 正式產品工作流
+blackcat --writing    :: 疊加寫作組合（可配任一 preset）
+blackcat --taskmaster :: 加裝 TaskMaster
+blackcat --list       :: 看全部選項
+blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 ```
 
-（`cat` 只是 `install-project.sh` 的捷徑，把當前目錄當目標專案；直接跑 `bash install-project.sh <專案路徑> ...` 效果相同）
+`cat --lean` 是 **cmd 限定**的縮寫（PowerShell 的 `cat` 被內建 Get-Content 別名佔用、macOS/Linux 的 `cat` 是系統指令，都搶不過——`blackcat` 和 `claude` 一樣是沒人佔用的名字，所以到處都通）。
+
+（都是 `install-project.sh` 的捷徑，把當前目錄當目標專案；直接跑 `bash install-project.sh <專案路徑> ...` 效果相同）
 
 | Preset | 適用 | Skills | Commands |
 |:--|:--|:--|:--|
@@ -213,6 +219,8 @@ cat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.6** | 2026-07-27 | 安裝改為「先清後裝」：舊版裝入 `~/.claude` 的管理項目（含 copy 模式的實體目錄）備份後移除，非本 repo 內容不動；install.sh / install-project.sh 全面英文化（避免 cmd 的 UTF-8 解析 bug） |
+| **v26.7.5** | 2026-07-27 | 修復 install.bat 中文字元導致 cmd 解析錯位（改純 ASCII，PATH 才能正確寫入）；Windows 增設 `blackcat.cmd` 供 PowerShell 使用（`cat` 被 Get-Content 別名佔用） |
 | **v26.7.4** | 2026-07-27 | 修復 Windows 安裝：install.bat 與 cat.cmd 明確使用 Git Bash 完整路徑（避免抓到 System32 的 WSL bash 而報「沒有已安裝的發佈」） |
 | **v26.7.3** | 2026-07-27 | 一鍵化：新增 `install.bat`（Windows 雙擊安裝 + 自動加 PATH）與 `cat`/`blackcat` 專案安裝指令；全域縮到只剩 settings + statusline（零 hooks）；rules 移為根目錄參考庫 |
 | **v26.7.2** | 2026-07-27 | 新增寫作組合：speak-human-tw v1.4.0 + humanizer v2.9.1、`--writing` 疊加選項；README 全面改寫並導入版號制 |
