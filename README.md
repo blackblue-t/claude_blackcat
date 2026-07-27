@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.16**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.17**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -96,10 +96,12 @@ user 提需求
   → /grill（Fable）拷問需求到沒有模糊地帶 → requirements 文件
   → /plan（Fable）架構 + 任務拆解；獨立且檔案不重疊的任務匯出到 .claude/tasks/
   → /dispatch（Opus ×N）每個任務一個獨立 worktree + 分支 + headless session
-  → /dispatch --merge 依序合併任務分支
+      （從 main 出發會自動先開 integrate/* 整合分支——main 在審查通過前保持乾淨）
+  → /dispatch --merge 依序把任務分支合進整合分支
   → 開新 session 跑 /review-code（Fable）——只讀 worklog.d/* + diff，天然跨 session
-  → /commit（Sonnet）驗 pass 才提交
-  → user check（push 由你決定）
+  → /commit（Sonnet）：一般路線 = 提交 working tree 變更；
+      並行路線 = 驗 pass 後把整合分支 merge --no-ff 回 main
+  → user check（git log 確認、push 由你決定；並行路線最後 /dispatch --clean）
 ```
 
 **為什麼是 worktree 而不是 sub-agent**：sub-agent 的產出全部回堆到主 session 的 context，任務一多就炸，而且每個 sub-agent 要重新讀一遍專案背景。worktree + headless session 是**完全獨立的 context**——互不污染、各自省流，程式碼隔離在各自分支，最後才合併。
@@ -324,6 +326,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.17** | 2026-07-27 | 修並行路線收尾：dispatch 從 main 出發自動開 `integrate/*` 整合分支（main 審查前保持乾淨）；/commit 增加並行模式——驗 pass 後把整合分支 merge --no-ff 回 main |
 | **v26.7.16** | 2026-07-27 | 調度改雙入口：新增 `/dispatch` slash command（Claude Code 內用，dry-run 確認、背景執行定期回報、衝突協助）與終端短別名 `bcd`；/dispatch 進 preset |
 | **v26.7.15** | 2026-07-27 | 完整流程落地：新增 /grill（Fable 需求拷問）、/plan 並行任務匯出、`blackcat-dispatch`（worktree 隔離 + headless 並行執行，`--max` 控併發、merge/clean/status 子模式）；worklog.d 並行紀錄機制 |
 | **v26.7.14** | 2026-07-27 | Graphify 改三層完整接線：skill + graph-first（CLAUDE.md 指示與 PreToolUse hook，自動省 token 的來源）+ git hook 自動增量重建；README 說明只裝 skill 沒效果的原因 |

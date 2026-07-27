@@ -170,6 +170,19 @@ fi
 command -v claude >/dev/null 2>&1 || {
     echo "[error] claude CLI not found on PATH"; exit 1; }
 
+# Never dispatch straight off main/master: tasks would merge into main
+# BEFORE review. Create an integration branch instead -- review happens
+# there, and /commit merges it back into main only after verdict: pass.
+if [ "$BASE_BRANCH" = "main" ] || [ "$BASE_BRANCH" = "master" ]; then
+    INT_BRANCH="integrate/$(date +%Y%m%d-%H%M%S)"
+    git -C "$PROJ" switch -c "$INT_BRANCH" >/dev/null 2>&1 || {
+        echo "[error] could not create integration branch $INT_BRANCH"; exit 1; }
+    echo "[branch] on $BASE_BRANCH -- created integration branch $INT_BRANCH"
+    echo "         (tasks branch from and merge back into it; $BASE_BRANCH stays"
+    echo "         clean until /review-code passes and /commit merges it back)"
+    BASE_BRANCH="$INT_BRANCH"
+fi
+
 TASKS="$(pending_tasks)"
 if [ -z "$TASKS" ]; then
     echo "[run] no pending tasks in .claude/tasks/ -- generate them with /plan first"
