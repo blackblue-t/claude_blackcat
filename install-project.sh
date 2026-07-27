@@ -15,6 +15,7 @@
 #   bash install-project.sh <project-path> --taskmaster # add TaskMaster workflow (project-template)
 #   bash install-project.sh <project-path> --update     # update-only: refresh installed items that changed in this repo
 #   bash install-project.sh <project-path> --models     # re-open the per-stage model picker
+#   bash install-project.sh <project-path> --graphify   # set up Graphify knowledge graph (token saver, needs graphify CLI)
 #   bash install-project.sh --list                      # list available items
 #
 # Updates: installed copies are never silently overwritten. Every run ends
@@ -109,6 +110,7 @@ NO_RULES=false
 UPDATE_ONLY=false
 MODEL_PICK=false
 FORCE_MODELS=false
+GRAPHIFY=false
 PRESET="lean"
 SKILLS=""
 COMMANDS=""
@@ -126,6 +128,7 @@ while [ $# -gt 0 ]; do
         --no-rules) NO_RULES=true ;;
         --update) UPDATE_ONLY=true ;;
         --models) FORCE_MODELS=true ;;
+        --graphify) GRAPHIFY=true ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
         --commands) COMMANDS="${2//,/ }"; shift ;;
         --agents) AGENTS="${2//,/ }"; shift ;;
@@ -414,6 +417,54 @@ if [ -n "$LANG_SETS$COMMON_SEL" ]; then
             done
         } >> "$CMD_FILE"
         echo "  [add] @-import block -> $CMD_FILE"
+    fi
+fi
+
+# ------------------------------------------------------------- graphify ----
+# Optional token saver: Graphify (github.com/Graphify-Labs/graphify) parses
+# the codebase locally (tree-sitter AST, no API calls) into a queryable
+# knowledge graph, so the assistant follows graph edges to the relevant
+# files instead of reading broadly. Worth it on larger projects (roughly
+# 500+ files); on small ones the graph build costs more than it saves.
+# We only orchestrate graphify's own installer -- the skill it creates
+# (.claude/skills/graphify) belongs to the graphify CLI and is deliberately
+# ignored by this repo's cleanup and update mechanisms.
+
+install_graphify() {
+    if ! command -v graphify >/dev/null 2>&1; then
+        echo "  [skip] graphify CLI not found. Install it first:"
+        echo "         uv tool install graphifyy    (or: pipx install graphifyy)"
+        echo "         then re-run: blackcat --graphify"
+        return 0
+    fi
+    echo "  [run] graphify install --project"
+    if (cd "$TARGET" && graphify install --project --platform claude >/dev/null 2>&1) \
+       || (cd "$TARGET" && graphify install --project >/dev/null 2>&1); then
+        echo "  [ok] graphify skill installed into the project"
+        echo "       Build the graph once from inside Claude Code with: /graphify ."
+    else
+        echo "  [error] graphify install failed -- run it manually inside the project:"
+        echo "          graphify install --project"
+    fi
+}
+
+if [ "$UPDATE_ONLY" != true ]; then
+    if [ "$GRAPHIFY" = true ]; then
+        echo ""
+        echo "[graphify]"
+        install_graphify
+    elif [ -t 0 ] && [ "$MODEL_PICK" = true ] && [ ! -d "$DEST/skills/graphify" ]; then
+        echo ""
+        echo "[graphify] Optional: index this codebase into a local knowledge graph so"
+        echo "           Claude navigates via graph queries instead of reading files"
+        echo "           broadly (big token savings on larger projects, ~500+ files;"
+        echo "           NOT worth it on small ones)."
+        printf "Set up Graphify for this project? [y/N] "
+        read -r ans || ans=""
+        case "$ans" in
+            y|Y|yes|YES) install_graphify ;;
+            *) ;;
+        esac
     fi
 fi
 

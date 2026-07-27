@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.12**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.13**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -50,6 +50,7 @@ blackcat --rules python  :: 直接指定編碼規範（common 全部 + 指定語
 blackcat --no-rules   :: 跳過規範選單（CI / 腳本用；非互動環境本來就會自動跳過）
 blackcat --taskmaster :: 加裝 TaskMaster
 blackcat --update     :: 純更新模式：blackcat repo 更新後，刷新專案裡已裝且有變動的項目
+blackcat --graphify   :: 加裝 Graphify 知識圖譜（省 token；需先裝 graphify CLI）
 blackcat --list       :: 看全部選項
 blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 ```
@@ -86,6 +87,15 @@ repo 端的預設值集中在這幾個位置，要整批調整（例如未來降
 執行 → 審查 → 提交靠 **worklog 接力**：執行時 worklog skill 把每個變更（動了哪些檔、做了什麼、驗證結果）追加到專案的 `.claude/worklog.md`；`/review-code` **只讀 worklog + 列出檔案的 git diff**（不掃全專案，Fable 的錢花在刀口上），結論寫回 worklog；`verdict: pass` 後 `/commit` 用 Sonnet 只 stage 紀錄過的檔案、寫 commit message、提交並歸檔 worklog。worklog skill 與 `/commit` 已加入 lean/strict 兩個 preset。
 
 > Fable 5 是 Opus 之上的模型級別、單價較高，所以只配給規劃與審查；用之前先在 CLI 打 `/model` 確認你的方案看得到 `claude-fable-5`，看不到就把兩個 frontmatter 降回 `opus`。
+
+### Graphify（省 token 選配）
+
+[Graphify](https://github.com/Graphify-Labs/graphify) 用 tree-sitter 在本地把程式碼解析成可查詢的知識圖譜（不打 API），之後 Claude 沿圖找到相關檔案再精準讀取，不用大範圍翻檔案定位——**大型專案（約 500+ 檔案）省最多，小專案建圖成本反而高於節省**，所以是選配不進 preset。
+
+- 前置：`uv tool install graphifyy`（或 `pipx install graphifyy`；PyPI 套件名是雙 y）。
+- 裝法：專案**首次**安裝的互動流程會問一次要不要裝；或隨時 `blackcat --graphify`。實際安裝由 graphify 自己的 `graphify install --project` 執行。
+- 裝完在 Claude Code 裡跑一次 `/graphify .` 建圖（產出 `graph.json` / `GRAPH_REPORT.md` / `graph.html`），之後查詢直接讀快取、程式碼變多再重建。
+- 它建立的 `.claude/skills/graphify` 歸 graphify CLI 管——blackcat 的清理與更新機制**刻意不碰**非本 repo 的 skills，互不干擾。
 
 ### 更新機制
 
@@ -272,6 +282,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.13** | 2026-07-27 | 整合 Graphify（選配省 token）：`--graphify` 編排其官方安裝器、首裝互動流程詢問一次；其 skill 歸 graphify CLI 管、不受本 repo 清理/更新機制影響 |
 | **v26.7.12** | 2026-07-27 | 專案初始化模型精靈：首裝自動探測 Fable 5 可用性（不可用降回 opus）並逐階段詢問 plan/review/commit/主迴圈模型；`--models` 重開精靈；更新機制忽略並保留專案自選 model |
 | **v26.7.11** | 2026-07-27 | 模型路由：/plan 與 /review-code 用 Fable 5、主迴圈 Opus、/commit（新指令）用 Sonnet；新增 worklog skill 讓執行紀錄接力給審查（review 只看 worklog 範圍不掃全庫）；兩者進 lean/strict preset |
 | **v26.7.10** | 2026-07-27 | 新增更新機制：每次 `blackcat` 結尾比對已裝項目與 repo 版本、互動詢問要更新哪些；`blackcat --update` 純更新模式一次刷新全部差異 |
