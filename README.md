@@ -38,9 +38,9 @@ cd claude_blackcat
 bash install.sh          # 自動偵測 OS，Windows 自動使用 copy 模式
 ```
 
-會自動：偵測 OS、動態替換路徑（`CLAUDE_PLUGIN_ROOT` → 當前機器的 `~/.claude`）、檢查 jq、**清掉舊版指向本 repo 的全域工作流 symlinks**。
+會自動：偵測 OS、檢查 jq、**清掉舊版指向本 repo 的全域工作流 symlinks**。
 
-安裝後手動設定：`settings.local.json`（API keys）、`.mcp.json`（每台機器不同）、[ECC plugin](https://github.com/affaan-m/everything-claude-code)（settings.json 的多數 hooks 依賴它）。
+安裝後手動設定：`settings.local.json`（API keys）、`.mcp.json`（每台機器不同）。**不再需要安裝 ECC plugin**——有用的 ECC skills/agents 已複製在本 repo，v3 起 settings.json 不再掛 ECC hooks。
 
 ### 專案（每個專案挑需要的）
 
@@ -96,7 +96,9 @@ GUNDAM 版多行彩色 statusline（模型 │ context │ 目錄+branch │ 時
 
 ## 全域 Hooks（settings.json）
 
-多數 hooks 依賴 ECC plugin（`CLAUDE_PLUGIN_ROOT`），未裝 ECC 時會靜默失敗或報錯。主要包含：block-no-verify、agent-monitor、suggest-compact、insaits-security、governance-capture、config-protection、quality-gate、observe。
+v3 起只剩一個：`agent-monitor.sh`（spawn subagent 時記錄到本地 log，bash、幾乎零成本）。
+
+舊版那 25+ 個 ECC hooks（observe、governance-capture、quality-gate、mcp-health-check…）已全部移除：每次 tool call spawn 2–4 個 node process，flag 系統從未被使用，ECC 未裝時整批靜默失敗。需要回滾看 git history 的 `global/settings.json`。
 
 ## 環境變數
 
@@ -104,13 +106,12 @@ GUNDAM 版多行彩色 statusline（模型 │ context │ 目錄+branch │ 時
 |:--|:--|:--|
 | `MAX_THINKING_TOKENS` | 10000 | 延伸思考 token 上限 |
 | `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` | 50 | 自動壓縮觸發閾值 |
-| `CLAUDE_PLUGIN_ROOT` | ~/.claude（安裝時自動設定） | ECC plugin 根目錄 |
 
 ## 設定來源
 
 | 來源 | 內容 |
 |:--|:--|
-| [ECC](https://github.com/affaan-m/everything-claude-code) | agents、hooks、部分 skills |
+| [ECC](https://github.com/affaan-m/everything-claude-code) | agents、部分 skills（已複製進本 repo，不需安裝 plugin） |
 | [GUNDAM](https://github.com/kuanweic/claude-GUNDAM-zh-tw) | TaskMaster、commands、output-styles、statusline |
 | [bheadwei/claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw) | 計畫持久化（plans/）、session 記錄（sessions/）機制 |
 | [ponytail](https://github.com/DietrichGebert/ponytail)（MIT） | ponytail、ponytail-review skills |
