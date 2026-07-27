@@ -29,6 +29,6 @@ powershell -NoProfile -Command "$bin=Join-Path $env:USERPROFILE '.claude\bin'; $
 
 echo.
 echo Done! Open a NEW terminal, then in any project folder:
-echo    cmd:        cat --lean       or  cat --strict
-echo    PowerShell: blackcat --lean  ("cat" is taken by Get-Content alias)
+echo    blackcat --lean   (works in cmd AND PowerShell)
+echo    cat --lean        (cmd-only shorthand)
 pause

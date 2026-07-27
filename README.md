@@ -38,22 +38,20 @@ bash install.sh     # 建立 blackcat 指令；把 ~/.claude/bin 加進 PATH
 
 全域裝完後，`cd` 到任何專案目錄：
 
+主指令是 **`blackcat`**，四個環境（cmd / PowerShell / macOS / Linux）打同一個字：
+
 ```bat
-cat --lean       :: 快速迭代工作流
-cat --strict     :: 正式產品工作流
-cat --writing    :: 疊加寫作組合（可配任一 preset）
-cat --taskmaster :: 加裝 TaskMaster
-cat --list       :: 看全部選項
-cat --skills django-tdd --agents python-reviewer   :: 手動指定
+blackcat --lean       :: 快速迭代工作流
+blackcat --strict     :: 正式產品工作流
+blackcat --writing    :: 疊加寫作組合（可配任一 preset）
+blackcat --taskmaster :: 加裝 TaskMaster
+blackcat --list       :: 看全部選項
+blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 ```
 
-| 環境 | 指令 |
-|:--|:--|
-| Windows cmd | `cat --lean` 或 `blackcat --lean` 都可 |
-| **PowerShell** | `blackcat --lean`（`cat` 被內建的 Get-Content 別名佔用） |
-| macOS / Linux | `blackcat --lean`（`cat` 是系統指令） |
+`cat --lean` 是 **cmd 限定**的縮寫（PowerShell 的 `cat` 被內建 Get-Content 別名佔用、macOS/Linux 的 `cat` 是系統指令，都搶不過——`blackcat` 和 `claude` 一樣是沒人佔用的名字，所以到處都通）。
 
-（都是 `install-project.sh` 的捷徑，把當前目錄當目標專案；直接跑 `bash install-project.sh <專案路徑> ...` 效果相同。想在 PowerShell 直接用 `cat`，可在 `$PROFILE` 加 `Remove-Item Alias:cat -Force`）
+（都是 `install-project.sh` 的捷徑，把當前目錄當目標專案；直接跑 `bash install-project.sh <專案路徑> ...` 效果相同）
 
 | Preset | 適用 | Skills | Commands |
 |:--|:--|:--|:--|
