@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.15**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.16**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -51,7 +51,7 @@ blackcat --no-rules   :: 跳過規範選單（CI / 腳本用；非互動環境�
 blackcat --taskmaster :: 加裝 TaskMaster
 blackcat --update     :: 純更新模式：blackcat repo 更新後，刷新專案裡已裝且有變動的項目
 blackcat --graphify   :: 加裝 Graphify 知識圖譜（省 token；需先裝 graphify CLI）
-blackcat-dispatch     :: 並行執行 /plan 匯出的任務（獨立 worktree + headless session）
+bcd                   :: 並行任務調度（blackcat-dispatch 的短別名；Claude Code 裡用 /dispatch）
 blackcat --list       :: 看全部選項
 blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 ```
@@ -95,8 +95,8 @@ repo 端的預設值集中在這幾個位置，要整批調整（例如未來降
 user 提需求
   → /grill（Fable）拷問需求到沒有模糊地帶 → requirements 文件
   → /plan（Fable）架構 + 任務拆解；獨立且檔案不重疊的任務匯出到 .claude/tasks/
-  → blackcat-dispatch（Opus ×N）每個任務一個獨立 worktree + 分支 + headless session
-  → blackcat-dispatch --merge 依序合併任務分支
+  → /dispatch（Opus ×N）每個任務一個獨立 worktree + 分支 + headless session
+  → /dispatch --merge 依序合併任務分支
   → 開新 session 跑 /review-code（Fable）——只讀 worklog.d/* + diff，天然跨 session
   → /commit（Sonnet）驗 pass 才提交
   → user check（push 由你決定）
@@ -104,15 +104,18 @@ user 提需求
 
 **為什麼是 worktree 而不是 sub-agent**：sub-agent 的產出全部回堆到主 session 的 context，任務一多就炸，而且每個 sub-agent 要重新讀一遍專案背景。worktree + headless session 是**完全獨立的 context**——互不污染、各自省流，程式碼隔離在各自分支，最後才合併。
 
-**dispatcher 用法**（`dispatch.sh`，裝完全域後指令是 `blackcat-dispatch`）：
+**dispatcher 用法**——兩個入口，同一個引擎（`dispatch.sh`）：
+
+- **Claude Code 裡**（推薦）：`/dispatch`。無參數會先 dry-run 給你確認才執行，執行中背景跑並定期回報進度、失敗任務自動摘 log 重點、合併衝突幫你解。參數直通：`/dispatch --max 3`、`/dispatch --merge`。
+- **終端機**：短別名 `bcd`（`blackcat-dispatch` 的縮寫，全平台同名）。
 
 ```bash
-blackcat-dispatch --dry-run       # 預覽會跑哪些任務
-blackcat-dispatch                 # 執行全部 pending 任務
-blackcat-dispatch --max 3 --save  # 最大同時 session 數，--save 存進 .claude/dispatch.conf
-blackcat-dispatch --status        # 看任務/分支狀態
-blackcat-dispatch --merge         # 合併完成的任務分支（衝突會停下指路）
-blackcat-dispatch --clean         # 移除 worktree、刪已合併分支
+bcd --dry-run       # 預覽會跑哪些任務
+bcd                 # 執行全部 pending 任務
+bcd --max 3 --save  # 最大同時 session 數，--save 存進 .claude/dispatch.conf
+bcd --status        # 看任務/分支狀態
+bcd --merge         # 合併完成的任務分支（衝突會停下指路）
+bcd --clean         # 移除 worktree、刪已合併分支
 ```
 
 **併發上限**三個層級：`--max N` 單次生效 → 加 `--save` 寫入專案 `.claude/dispatch.conf`（`MAX_PARALLEL=N`，之後預設沿用）→ 都沒設預設 2。conf 還可設 `DISPATCH_MODEL`（任務預設模型，個別任務檔可用 `model:` 覆蓋）與 `DISPATCH_PERMISSIONS`（`acceptEdits` 預設：自動核准檔案編輯，但 git commit 等 Bash 指令要靠專案 permissions 允許；`skip` = `--dangerously-skip-permissions`，worktree 內全自動，只在信任的專案用）。
@@ -321,6 +324,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.16** | 2026-07-27 | 調度改雙入口：新增 `/dispatch` slash command（Claude Code 內用，dry-run 確認、背景執行定期回報、衝突協助）與終端短別名 `bcd`；/dispatch 進 preset |
 | **v26.7.15** | 2026-07-27 | 完整流程落地：新增 /grill（Fable 需求拷問）、/plan 並行任務匯出、`blackcat-dispatch`（worktree 隔離 + headless 並行執行，`--max` 控併發、merge/clean/status 子模式）；worklog.d 並行紀錄機制 |
 | **v26.7.14** | 2026-07-27 | Graphify 改三層完整接線：skill + graph-first（CLAUDE.md 指示與 PreToolUse hook，自動省 token 的來源）+ git hook 自動增量重建；README 說明只裝 skill 沒效果的原因 |
 | **v26.7.13** | 2026-07-27 | 整合 Graphify（選配省 token）：`--graphify` 編排其官方安裝器、首裝互動流程詢問一次；其 skill 歸 graphify CLI 管、不受本 repo 清理/更新機制影響 |
