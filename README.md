@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.9**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.10**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -49,6 +49,7 @@ blackcat --writing    :: 疊加寫作組合（可配任一 preset）
 blackcat --rules python  :: 直接指定編碼規範（common 全部 + 指定語言，不經選單）
 blackcat --no-rules   :: 跳過規範選單（CI / 腳本用；非互動環境本來就會自動跳過）
 blackcat --taskmaster :: 加裝 TaskMaster
+blackcat --update     :: 純更新模式：blackcat repo 更新後，刷新專案裡已裝且有變動的項目
 blackcat --list       :: 看全部選項
 blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 ```
@@ -66,6 +67,15 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 > lean 和 strict **刻意互斥**：ponytail 的「測試留最小 check」和 tdd-workflow 的「強制 80% 覆蓋率」觸發條件相同、指令互相矛盾，同裝會讓行為不可預測。要混用請自行 `--skills` 指定。`--writing` 則跟兩者都不衝突（不同場域）。
 
 裝完把專案的 `.claude/` 提交進該專案的 git。
+
+### 更新機制
+
+裝進專案的檔案**永遠不會被靜默覆蓋**（重跑會顯示 `[keep]`）。當你更新了 blackcat repo（`git pull` 或自己改），已裝的專案這樣同步：
+
+- **每次跑 `blackcat`**（任何 preset）結尾都會做更新檢查：比對專案已裝項目與 repo 版本，列出有差異的（skills / rules / commands / agents / output-styles），互動模式下**詢問要更新哪些**（`a` 全更、Enter 跳過、輸入編號挑選）。
+- **`blackcat --update`**：純更新模式——不裝任何新東西，直接刷新所有有差異的項目、不逐項詢問。這是「更新 blackcat repo → 到各專案跑一次」的標準流程。
+- 更新會**覆蓋該項目的本地修改**（提示訊息會先警告），所以專案的 `.claude/` 記得先 commit；非互動環境（CI）只列差異不動手。
+- 小提醒：rules 組合若新增了「新檔案」，更新會複製進來但 CLAUDE.md 的 `@import` 區塊不會自動加行（那是你挑選過的清單），輸出會提示手動補。
 
 ---
 
@@ -243,6 +253,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.10** | 2026-07-27 | 新增更新機制：每次 `blackcat` 結尾比對已裝項目與 repo 版本、互動詢問要更新哪些；`blackcat --update` 純更新模式一次刷新全部差異 |
 | **v26.7.9** | 2026-07-27 | 規範改互動選裝：`blackcat` 安裝結尾跳出規範選單（語言組合 + 9 條 common 各附一句說明，可逐條挑）；新增 `--no-rules`；非互動環境自動跳過 |
 | **v26.7.8** | 2026-07-27 | rules 正式接線：新增 `--rules` 選項（複製進專案 `.claude/rules/` + CLAUDE.md 帶標記 `@import` 區塊，冪等）；修正 rules/README.md 過時安裝說明（參考 claw-code 的 rules 自動載入設計，改用 Claude Code 原生 memory import 實現） |
 | **v26.7.7** | 2026-07-27 | 修 Windows shim 執行失敗：非 login 啟動的 Git Bash 沒有 /usr/bin，安裝腳本開頭改用純 builtin 自補 PATH |

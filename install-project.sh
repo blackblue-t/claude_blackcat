@@ -13,7 +13,16 @@
 #   bash install-project.sh <project-path> --skills a,b --commands x,y --agents m,n
 #   bash install-project.sh <project-path> --rules python    # coding rules (common + language sets)
 #   bash install-project.sh <project-path> --taskmaster # add TaskMaster workflow (project-template)
+#   bash install-project.sh <project-path> --update     # update-only: refresh installed items that changed in this repo
 #   bash install-project.sh --list                      # list available items
+#
+# Updates: installed copies are never silently overwritten. Every run ends
+# with an update check that compares the project's installed items against
+# this repo's versions; differing items are listed and (interactively)
+# offered for update. --update runs ONLY that check and refreshes all
+# differing items without asking -- the intended flow after pulling new
+# versions of this repo. Updating overwrites local edits to those files,
+# so commit the project's .claude/ first.
 #
 # --rules copies rule files into <project>/.claude/rules/ AND writes a marked
 # @-import block into the project's CLAUDE.md. Claude Code does NOT auto-load
@@ -93,6 +102,7 @@ TASKMASTER=false
 WRITING=false
 RULES=""
 NO_RULES=false
+UPDATE_ONLY=false
 PRESET="lean"
 SKILLS=""
 COMMANDS=""
@@ -108,6 +118,7 @@ while [ $# -gt 0 ]; do
         --taskmaster) TASKMASTER=true ;;
         --rules) RULES="${2//,/ }"; shift ;;
         --no-rules) NO_RULES=true ;;
+        --update) UPDATE_ONLY=true ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
         --commands) COMMANDS="${2//,/ }"; shift ;;
         --agents) AGENTS="${2//,/ }"; shift ;;
@@ -122,6 +133,9 @@ if [ "$ALL" = true ]; then
     COMMANDS=$(ls "$SCRIPT_DIR/commands" | sed 's/\.md$//')
     AGENTS=$(ls "$SCRIPT_DIR/agents" | sed 's/\.md$//')
     STYLES=$(ls "$SCRIPT_DIR/output-styles" | grep '\.md$' | sed 's/\.md$//')
+elif [ "$UPDATE_ONLY" = true ]; then
+    # Update-only mode: install nothing new, just run the update check below.
+    echo "[update-only] checking installed items against the repo..."
 else
     # Anything not explicitly given via --skills/--commands falls back to the preset.
     if [ -z "$SKILLS" ]; then
@@ -203,7 +217,7 @@ if [ -n "$RULES" ]; then
         [ "$r" = "common" ] && continue
         LANG_SETS="$LANG_SETS $r"
     done
-elif [ "$NO_RULES" != true ] && [ -t 0 ]; then
+elif [ "$NO_RULES" != true ] && [ "$UPDATE_ONLY" != true ] && [ -t 0 ]; then
     # Interactive picker: only when stdin is a terminal.
     echo ""
     echo "[rules] Coding rules can be @-imported into this project's CLAUDE.md."
@@ -315,6 +329,78 @@ if [ "$TASKMASTER" = true ]; then
         echo "  [copy] settings.json"
     else
         echo "  [keep] settings.json (already exists -- merge TaskMaster hooks manually)"
+    fi
+fi
+
+# --------------------------------------------------------------- update ----
+# Installed copies are never silently overwritten ([keep] above). Compare
+# every installed item against this repo's version and offer to refresh the
+# ones that differ. --update refreshes all of them without asking.
+
+UPDATE_LIST=""
+
+for kind in skills rules; do
+    for d in "$DEST/$kind"/*/; do
+        [ -d "$d" ] || continue
+        name="$(basename "$d")"
+        src="$SCRIPT_DIR/$kind/$name"
+        [ -d "$src" ] || continue
+        diff -rq "$src" "$d" >/dev/null 2>&1 || UPDATE_LIST="$UPDATE_LIST $kind/$name"
+    done
+done
+for kind in commands agents output-styles; do
+    for f in "$DEST/$kind"/*.md; do
+        [ -f "$f" ] || continue
+        name="$(basename "$f")"
+        src="$SCRIPT_DIR/$kind/$name"
+        [ -f "$src" ] || continue
+        cmp -s "$src" "$f" || UPDATE_LIST="$UPDATE_LIST $kind/$name"
+    done
+done
+
+do_update() {
+    local src="$SCRIPT_DIR/$1" dst="$DEST/$1"
+    if [ -d "$src" ]; then
+        rm -rf "$dst"
+        cp -r "$src" "$dst"
+    else
+        cp "$src" "$dst"
+    fi
+    echo "  [update] $1"
+    case "$1" in rules/*)
+        echo "           (if this set gained NEW files, add their @-import lines to CLAUDE.md manually)" ;;
+    esac
+}
+
+if [ -z "$UPDATE_LIST" ]; then
+    [ "$UPDATE_ONLY" = true ] && echo "[update] everything is up to date with the repo"
+else
+    echo ""
+    echo "[update] these installed items differ from the repo versions:"
+    i=1
+    upd_opts=""
+    for item in $UPDATE_LIST; do
+        printf "  %d) %s\n" "$i" "$item"
+        upd_opts="$upd_opts $i:$item"
+        i=$((i+1))
+    done
+    if [ "$UPDATE_ONLY" = true ]; then
+        for item in $UPDATE_LIST; do do_update "$item"; done
+    elif [ -t 0 ]; then
+        echo "Updating OVERWRITES local edits to these files (commit the project's .claude/ first)."
+        printf "Update which? (a for all, Enter for none, numbers to pick): "
+        read -r sel || sel=""
+        if [ "$sel" = "a" ] || [ "$sel" = "A" ]; then
+            for item in $UPDATE_LIST; do do_update "$item"; done
+        else
+            for n in $sel; do
+                for pair in $upd_opts; do
+                    [ "${pair%%:*}" = "$n" ] && do_update "${pair#*:}"
+                done
+            done
+        fi
+    else
+        echo "  (non-interactive run -- refresh them with: blackcat --update)"
     fi
 fi
 
