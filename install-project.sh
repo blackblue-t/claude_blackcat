@@ -23,9 +23,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # preset 組合
 LEAN_SKILLS="ponytail ponytail-review"
-LEAN_COMMANDS="plan review-code"
+LEAN_COMMANDS="plan review-code save-session"
 STRICT_SKILLS="tdd-workflow verification-loop"
-STRICT_COMMANDS="plan tdd verify review-code"
+STRICT_COMMANDS="plan tdd verify review-code save-session"
 
 list_items() {
     local kind

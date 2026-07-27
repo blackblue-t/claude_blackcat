@@ -4,7 +4,7 @@
 
 ## 設計原則（v2 重構）
 
-參考 [mattpocock/skills](https://github.com/mattpocock/skills) 的做法：
+完整工作流說明見 **[WORKFLOW.md](WORKFLOW.md)**（多家思想的融合與取捨）。核心原則參考 [mattpocock/skills](https://github.com/mattpocock/skills)：
 
 - **全域（`~/.claude/`）只放「偏好」**：settings、statusline、hooks、編碼規範。跟著人走，每台機器一樣。
 - **工作流放「專案」**：skills / commands / agents / output-styles 用 `install-project.sh` **複製**進各專案的 `.claude/`，跟著專案走、可以針對專案客製、隨專案進 git。
@@ -48,8 +48,8 @@ bash install.sh          # 自動偵測 OS，Windows 自動使用 copy 模式
 cd claude_blackcat
 bash install-project.sh --list                      # 看有什麼可裝
 bash install-project.sh ~/code/my-project           # 預設 --lean
-bash install-project.sh ~/code/my-project --lean    # 快速迭代：ponytail + ponytail-review + /plan /review-code
-bash install-project.sh ~/code/my-project --strict  # 正式產品：tdd-workflow + verification-loop + /plan /tdd /verify /review-code
+bash install-project.sh ~/code/my-project --lean    # 快速迭代：ponytail + ponytail-review + /plan /review-code /save-session
+bash install-project.sh ~/code/my-project --strict  # 正式產品：tdd-workflow + verification-loop + /plan /tdd /verify /review-code /save-session
 bash install-project.sh ~/code/my-project --all     # 全部
 bash install-project.sh ~/code/my-project --skills django-tdd,django-patterns --agents python-reviewer
 bash install-project.sh ~/code/my-project --taskmaster   # 加裝 TaskMaster 工作流
@@ -74,7 +74,9 @@ bash install-project.sh ~/code/my-project --taskmaster   # 加裝 TaskMaster 工
 
 皆為**專案級選裝庫**，內容同 v1（GUNDAM TaskMaster 工作流 + ECC agents）：
 
-- **Commands（12）**：`/task-init` `/task-next` `/task-status` `/plan` `/tdd` `/verify` `/build-fix` `/review-code` `/e2e` `/hub-delegate` `/suggest-mode` `/time-log`
+- **Commands（13）**：`/task-init` `/task-next` `/task-status` `/plan` `/tdd` `/verify` `/save-session` `/build-fix` `/review-code` `/e2e` `/hub-delegate` `/suggest-mode` `/time-log`
+  - `/plan` 確認後會把計畫存到專案的 `.claude/plans/`，`/tdd` 自動接續、`/verify` 通過後歸檔（跨 session 不斷點，機制引自 bheadwei GUNDAM v5.2）
+  - `/save-session` 收工前把成果與**失敗嘗試**存到 `.claude/sessions/`
 - **Agents（17）**：planner、architect、tdd-guide、code-reviewer、security-reviewer、build-error-resolver、e2e-runner、refactor-cleaner、doc-updater、docs-lookup、database-reviewer、python/typescript/rust-reviewer、rust/pytorch-build-resolver、chief-of-staff
 - **Output Styles（15）**：PRD、BDD、架構、DDD、API 契約、TDD 規格、審查清單、安全清單、DB Schema、Python 實作、前端 BDD、整合契約、資料契約、CI 門檻、Vision
 
@@ -110,5 +112,6 @@ GUNDAM 版多行彩色 statusline（模型 │ context │ 目錄+branch │ 時
 |:--|:--|
 | [ECC](https://github.com/affaan-m/everything-claude-code) | agents、hooks、部分 skills |
 | [GUNDAM](https://github.com/kuanweic/claude-GUNDAM-zh-tw) | TaskMaster、commands、output-styles、statusline |
+| [bheadwei/claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw) | 計畫持久化（plans/）、session 記錄（sessions/）機制 |
 | [ponytail](https://github.com/DietrichGebert/ponytail)（MIT） | ponytail、ponytail-review skills |
 | [mattpocock/skills](https://github.com/mattpocock/skills) | 「工作流進專案、複製可客製」的架構理念 |

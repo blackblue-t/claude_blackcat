@@ -52,6 +52,10 @@ Ready for PR: [YES/NO]
 
 如有任何關鍵問題，列出並附修復建議。
 
+## 計畫歸檔
+
+結果為 PASS 且 `.claude/plans/` 有 `status: active` 且所有階段已勾完的計畫 → 把該計畫的 `status` 改為 `done` 並更新 `updated`。FAIL 則不動計畫狀態。
+
 ## 參數
 
 $ARGUMENTS 可以是：

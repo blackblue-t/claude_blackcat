@@ -1,5 +1,5 @@
 ---
-description: 重述需求、評估風險、建立逐步實作計畫。等待使用者確認後才開始寫程式碼。
+description: 重述需求、評估風險、建立逐步實作計畫。確認後存檔到 .claude/plans/，供 /tdd 與後續 session 接續。
 ---
 
 # 規劃指令
@@ -31,6 +31,30 @@ planner agent 會：
 4. **評估風險**和潛在阻礙
 5. **預估複雜度**（高/中/低）
 6. **呈現計畫**並等待你的明確確認
+
+## 計畫持久化
+
+使用者**確認計畫後**，寫入 `.claude/plans/<YYYY-MM-DD>-<slug>.md`：
+
+```yaml
+---
+status: active        # active → done（/verify 全過後更新）
+current_phase: 1
+files: [會動到的檔案清單]
+updated: <日期>
+---
+# <計畫標題>
+
+## Phase 1: 介面/契約
+- [ ] 步驟與驗收條件
+## Phase 2: 核心邏輯
+## Phase 3: 整合
+## Phase 4: 收尾
+```
+
+- 階段數依任務調整，小任務一兩個 phase 就好，不硬湊四個
+- 已存在 `status: active` 的計畫時，先提示是否接續，不要疊新計畫
+- 確認前**不寫任何檔案**（包含計畫檔本身）
 
 ## 重要提醒
 
