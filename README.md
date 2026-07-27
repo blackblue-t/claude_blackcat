@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.8**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.9**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -46,7 +46,8 @@ bash install.sh     # 建立 blackcat 指令；把 ~/.claude/bin 加進 PATH
 blackcat --lean       :: 快速迭代工作流
 blackcat --strict     :: 正式產品工作流
 blackcat --writing    :: 疊加寫作組合（可配任一 preset）
-blackcat --rules python  :: 加裝編碼規範（common + 指定語言，經 CLAUDE.md @import 接進 prompt）
+blackcat --rules python  :: 直接指定編碼規範（common 全部 + 指定語言，不經選單）
+blackcat --no-rules   :: 跳過規範選單（CI / 腳本用；非互動環境本來就會自動跳過）
 blackcat --taskmaster :: 加裝 TaskMaster
 blackcat --list       :: 看全部選項
 blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
@@ -191,7 +192,29 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 **Hooks**：v26.7.3 起全域**零 hooks**。agent-monitor 移至 project-template（`--taskmaster` 時隨專案安裝）；舊版 25+ 個 ECC hooks 已於 v26.7.1 移除。回滾看 git history。
 
-**Rules**：24 個編碼規範文件（common 9 + python/typescript/rust 各 5），用 `blackcat --rules python` 選裝進專案。注意 **Claude Code 不會自動載入 rules 目錄**——安裝器會把規範複製進專案 `.claude/rules/` 並在專案 CLAUDE.md 附加一段帶標記的 `@import` 區塊（原生 memory import 機制），這才是規範真正進入 startup prompt 的接線。重跑不會重複附加；每個 import 的檔案都吃 context，按專案需要選裝。
+**Rules**：24 個編碼規範文件（common 9 + python/typescript/rust 各 5）。注意 **Claude Code 不會自動載入 rules 目錄**——安裝器會把規範複製進專案 `.claude/rules/` 並在專案 CLAUDE.md 附加一段帶標記的 `@import` 區塊（原生 memory import 機制），這才是規範真正進入 startup prompt 的接線。重跑不會重複附加；每個 import 的檔案都吃 context，按專案需要選裝。
+
+裝法有兩種：跑 `blackcat --lean`（或任何 preset）結尾會出現**互動選單**，先問要不要裝（Enter = 不裝），要裝的話列出語言組合與 9 條 common 規範各附一句說明，輸入編號挑選（common 直接 Enter = 全裝、`n` = 不裝）；或用 `--rules python` 直接指定跳過選單。選單只在互動終端機出現，CI / 管線自動靜默跳過，也可用 `--no-rules` 強制關閉：
+
+```
+Add coding rules to CLAUDE.md? [y/N] y
+Language sets (a set imports all 5 of its files):
+  1) python       Python set: style/testing/patterns/hooks/security
+  2) rust         Rust set: style/testing/patterns/hooks/security
+  3) typescript   TypeScript/JS set: style/testing/patterns/hooks/security
+Select sets (numbers separated by spaces, Enter for none): 1
+Common rules (language-agnostic):
+  1) agents.md                when/how to design subagents and delegate work
+  2) coding-style.md          naming, function size, immutability defaults
+  3) development-workflow.md  plan -> implement -> verify working loop
+  4) git-workflow.md          branching, commit messages, PR conventions
+  5) hooks.md                 auto-run formatters/linters via PostToolUse hooks
+  6) patterns.md              preferred design patterns and anti-patterns
+  7) performance.md           measure-before-optimize guidelines
+  8) security.md              secrets, input validation, dependency hygiene
+  9) testing.md               test structure and coverage expectations
+Select common rules (Enter for all, n for none, numbers to pick): 2 9
+```
 
 **環境變數**：
 
@@ -220,6 +243,7 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.9** | 2026-07-27 | 規範改互動選裝：`blackcat` 安裝結尾跳出規範選單（語言組合 + 9 條 common 各附一句說明，可逐條挑）；新增 `--no-rules`；非互動環境自動跳過 |
 | **v26.7.8** | 2026-07-27 | rules 正式接線：新增 `--rules` 選項（複製進專案 `.claude/rules/` + CLAUDE.md 帶標記 `@import` 區塊，冪等）；修正 rules/README.md 過時安裝說明（參考 claw-code 的 rules 自動載入設計，改用 Claude Code 原生 memory import 實現） |
 | **v26.7.7** | 2026-07-27 | 修 Windows shim 執行失敗：非 login 啟動的 Git Bash 沒有 /usr/bin，安裝腳本開頭改用純 builtin 自補 PATH |
 | **v26.7.6** | 2026-07-27 | 安裝改為「先清後裝」：舊版裝入 `~/.claude` 的管理項目（含 copy 模式的實體目錄）備份後移除，非本 repo 內容不動；install.sh / install-project.sh 全面英文化（避免 cmd 的 UTF-8 解析 bug） |

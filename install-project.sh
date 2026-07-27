@@ -20,6 +20,11 @@
 # rules directories -- files only reach the system prompt when CLAUDE.md
 # imports them, so the import block is what actually wires them up.
 #
+# When run interactively WITHOUT --rules, an interactive picker offers the
+# rule sets (with a one-line description each) after the main install.
+# Pass --no-rules to suppress the picker; non-interactive runs (no TTY on
+# stdin) skip it automatically.
+#
 # Default preset (no flags) is --lean.
 # lean and strict are intentionally exclusive: ponytail ("one minimal check
 # is enough") and tdd-workflow ("test-first, 80%+ coverage") both trigger on
@@ -66,7 +71,7 @@ list_items() {
 }
 
 if [ "$1" = "--list" ] || [ -z "$1" ]; then
-    echo "Usage: bash install-project.sh <project-path> [--lean|--strict|--all] [--writing] [--taskmaster] [--rules lang1,lang2] [--skills a,b] [--commands x,y] [--agents m,n] [--output-styles p,q]"
+    echo "Usage: bash install-project.sh <project-path> [--lean|--strict|--all] [--writing] [--taskmaster] [--rules lang1,lang2 | --no-rules] [--skills a,b] [--commands x,y] [--agents m,n] [--output-styles p,q]"
     echo ""
     echo "  --lean     fast-iteration preset: $LEAN_SKILLS (default)"
     echo "  --strict   production preset:     $STRICT_SKILLS"
@@ -87,6 +92,7 @@ ALL=false
 TASKMASTER=false
 WRITING=false
 RULES=""
+NO_RULES=false
 PRESET="lean"
 SKILLS=""
 COMMANDS=""
@@ -101,6 +107,7 @@ while [ $# -gt 0 ]; do
         --writing) WRITING=true ;;
         --taskmaster) TASKMASTER=true ;;
         --rules) RULES="${2//,/ }"; shift ;;
+        --no-rules) NO_RULES=true ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
         --commands) COMMANDS="${2//,/ }"; shift ;;
         --agents) AGENTS="${2//,/ }"; shift ;;
@@ -159,10 +166,105 @@ for c in $COMMANDS; do install_md commands "$c"; done
 for a in $AGENTS; do install_md agents "$a"; done
 for o in $STYLES; do install_md output-styles "$o"; done
 
+# ---------------------------------------------------------------- rules ----
+# Claude Code does not auto-load rules directories. Rule files only reach
+# the system prompt if the project's CLAUDE.md @-imports them, so the final
+# step below appends a marked import block (idempotent via the marker;
+# existing CLAUDE.md content is never modified).
+
+COMMON_ALL="agents coding-style development-workflow git-workflow hooks patterns performance security testing"
+
+rule_desc() {
+    case "$1" in
+        agents)               echo "when/how to design subagents and delegate work" ;;
+        coding-style)         echo "naming, function size, immutability defaults" ;;
+        development-workflow) echo "plan -> implement -> verify working loop" ;;
+        git-workflow)         echo "branching, commit messages, PR conventions" ;;
+        hooks)                echo "auto-run formatters/linters via PostToolUse hooks" ;;
+        patterns)             echo "preferred design patterns and anti-patterns" ;;
+        performance)          echo "measure-before-optimize guidelines" ;;
+        security)             echo "secrets, input validation, dependency hygiene" ;;
+        testing)              echo "test structure and coverage expectations" ;;
+        python)               echo "Python set: style/testing/patterns/hooks/security" ;;
+        rust)                 echo "Rust set: style/testing/patterns/hooks/security" ;;
+        typescript)           echo "TypeScript/JS set: style/testing/patterns/hooks/security" ;;
+        *)                    echo "" ;;
+    esac
+}
+
+LANG_SETS=""
+COMMON_SEL=""
+
 if [ -n "$RULES" ]; then
+    # Explicit --rules keeps the original behavior: all common rules plus
+    # every named language set.
+    COMMON_SEL="$COMMON_ALL"
+    for r in $RULES; do
+        [ "$r" = "common" ] && continue
+        LANG_SETS="$LANG_SETS $r"
+    done
+elif [ "$NO_RULES" != true ] && [ -t 0 ]; then
+    # Interactive picker: only when stdin is a terminal.
     echo ""
-    echo "[rules] installing rule sets: common $RULES"
-    for r in common $RULES; do
+    echo "[rules] Coding rules can be @-imported into this project's CLAUDE.md."
+    echo "        Each imported file costs context every session -- pick only what you need."
+    printf "Add coding rules to CLAUDE.md? [y/N] "
+    read -r ans || ans=""
+    case "$ans" in
+        y|Y|yes|YES)
+            echo ""
+            echo "Language sets (a set imports all 5 of its files):"
+            i=1
+            lang_opts=""
+            for l in $(ls "$SCRIPT_DIR/rules"); do
+                [ "$l" = "common" ] && continue
+                [ -d "$SCRIPT_DIR/rules/$l" ] || continue
+                printf "  %d) %-12s %s\n" "$i" "$l" "$(rule_desc "$l")"
+                lang_opts="$lang_opts $i:$l"
+                i=$((i+1))
+            done
+            printf "Select sets (numbers separated by spaces, Enter for none): "
+            read -r sel || sel=""
+            for n in $sel; do
+                for pair in $lang_opts; do
+                    [ "${pair%%:*}" = "$n" ] && LANG_SETS="$LANG_SETS ${pair#*:}"
+                done
+            done
+
+            echo ""
+            echo "Common rules (language-agnostic):"
+            i=1
+            common_opts=""
+            for c in $COMMON_ALL; do
+                printf "  %d) %-24s %s\n" "$i" "$c.md" "$(rule_desc "$c")"
+                common_opts="$common_opts $i:$c"
+                i=$((i+1))
+            done
+            printf "Select common rules (Enter for all, n for none, numbers to pick): "
+            read -r sel || sel=""
+            if [ -z "$sel" ]; then
+                COMMON_SEL="$COMMON_ALL"
+            elif [ "$sel" = "n" ] || [ "$sel" = "N" ]; then
+                COMMON_SEL=""
+            else
+                for n in $sel; do
+                    for pair in $common_opts; do
+                        [ "${pair%%:*}" = "$n" ] && COMMON_SEL="$COMMON_SEL ${pair#*:}"
+                    done
+                done
+            fi
+            ;;
+        *) ;;
+    esac
+fi
+
+if [ -n "$LANG_SETS$COMMON_SEL" ]; then
+    echo ""
+    echo "[rules] installing:${COMMON_SEL:+ common:(${COMMON_SEL# })}${LANG_SETS:+ sets:${LANG_SETS# }}"
+    # The common directory is always copied when anything is selected --
+    # language files reference ../common/ counterparts. Only the SELECTED
+    # files get @-imported, so unselected copies cost zero context.
+    for r in common $LANG_SETS; do
         src="$SCRIPT_DIR/rules/$r"
         if [ ! -d "$src" ]; then echo "  [skip] rules/$r (not found)"; continue; fi
         if [ -d "$DEST/rules/$r" ]; then echo "  [keep] rules/$r (already exists)"; continue; fi
@@ -170,10 +272,6 @@ if [ -n "$RULES" ]; then
         cp -r "$src" "$DEST/rules/$r"
         echo "  [copy] rules/$r"
     done
-    # Claude Code does not auto-load rules directories. The files above only
-    # reach the system prompt if the project's CLAUDE.md @-imports them, so
-    # append a marked import block (skipped if the marker already exists;
-    # existing CLAUDE.md content is never modified).
     CMD_FILE="$TARGET/CLAUDE.md"
     MARK="<!-- blackcat:rules -->"
     if [ -f "$CMD_FILE" ] && grep -qF "$MARK" "$CMD_FILE"; then
@@ -185,7 +283,10 @@ if [ -n "$RULES" ]; then
             echo "<!-- Coding rules installed by claude_blackcat. Claude Code only"
             echo "     loads these because they are @-imported below. To drop a rule,"
             echo "     delete its line; to drop them all, delete this block. -->"
-            for r in common $RULES; do
+            for c in $COMMON_SEL; do
+                [ -f "$DEST/rules/common/$c.md" ] && echo "@.claude/rules/common/$c.md"
+            done
+            for r in $LANG_SETS; do
                 [ -d "$DEST/rules/$r" ] || continue
                 for f in "$DEST/rules/$r"/*.md; do
                     [ -f "$f" ] || continue

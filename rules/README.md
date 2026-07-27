@@ -35,12 +35,16 @@ only enters the system prompt when a `CLAUDE.md` imports it with the native
 Use the project installer (`blackcat` shim or `install-project.sh` directly):
 
 ```bash
-# From inside the target project:
-blackcat --rules python              # common + python
-blackcat --lean --rules typescript   # combine with any preset
+# Interactive (default): any preset run ends with a rules picker that lists
+# language sets and each common rule with a one-line description.
+blackcat --lean
 
-# Or explicitly:
+# Non-interactive: name the sets explicitly (imports ALL common rules too):
+blackcat --rules python
 bash install-project.sh <project-path> --rules python,rust
+
+# Suppress the picker (CI/scripts; non-TTY runs skip it automatically):
+blackcat --lean --no-rules
 ```
 
 This does two things:
