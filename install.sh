@@ -86,7 +86,14 @@ BIN_DIR="$CLAUDE_DIR/bin"
 mkdir -p "$BIN_DIR"
 if [ "$OS_TYPE" = "windows" ]; then
     # cmd 用：cat --lean / cat --strict（%cd% 轉正斜線給 bash）
-    printf '@echo off\r\nset "P=%%cd:\\=/%%"\r\nbash "%s/install-project.sh" "%%P%%" %%*\r\n' "$SCRIPT_DIR" > "$BIN_DIR/cat.cmd"
+    # 寫死 Git Bash 完整路徑——裸寫 bash 會被 System32 的 WSL bash 搶走
+    BASH_EXE="bash"
+    REPO_WIN="$SCRIPT_DIR"
+    if command -v cygpath >/dev/null 2>&1; then
+        [ -f /usr/bin/bash.exe ] && BASH_EXE="$(cygpath -w /usr/bin/bash.exe)"
+        REPO_WIN="$(cygpath -m "$SCRIPT_DIR")"
+    fi
+    printf '@echo off\r\nset "P=%%cd:\\=/%%"\r\n"%s" "%s/install-project.sh" "%%P%%" %%*\r\n' "$BASH_EXE" "$REPO_WIN" > "$BIN_DIR/cat.cmd"
     echo ""
     echo "✅ 已建立 cat 指令：$BIN_DIR/cat.cmd"
     echo "   （install.bat 會自動把 %USERPROFILE%\\.claude\\bin 加入 PATH）"

@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.3**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.4**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -213,6 +213,7 @@ cat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.4** | 2026-07-27 | 修復 Windows 安裝：install.bat 與 cat.cmd 明確使用 Git Bash 完整路徑（避免抓到 System32 的 WSL bash 而報「沒有已安裝的發佈」） |
 | **v26.7.3** | 2026-07-27 | 一鍵化：新增 `install.bat`（Windows 雙擊安裝 + 自動加 PATH）與 `cat`/`blackcat` 專案安裝指令；全域縮到只剩 settings + statusline（零 hooks）；rules 移為根目錄參考庫 |
 | **v26.7.2** | 2026-07-27 | 新增寫作組合：speak-human-tw v1.4.0 + humanizer v2.9.1、`--writing` 疊加選項；README 全面改寫並導入版號制 |
 | **v26.7.1** | 2026-07-27 | 大重構：工作流全域→專案級、install-project.sh 與 lean/strict presets、引入 ponytail、計畫持久化 + /save-session（融合 bheadwei GUNDAM）、移除全部 ECC hooks（settings.json 313→40 行）、WORKFLOW.md |
