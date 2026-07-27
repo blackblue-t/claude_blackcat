@@ -430,6 +430,15 @@ fi
 # (.claude/skills/graphify) belongs to the graphify CLI and is deliberately
 # ignored by this repo's cleanup and update mechanisms.
 
+# Full wiring is three layers -- the skill alone does NOT make the
+# assistant use the graph:
+#   1. skill      (graphify install --project)  -> manual /graphify commands
+#   2. graph-first (graphify claude install)    -> CLAUDE.md instructions +
+#      PreToolUse hook that nudges search-style tool calls toward the graph;
+#      without this layer the assistant keeps reading files the old way
+#   3. auto-rebuild (graphify hook install)     -> git post-commit/checkout
+#      hooks re-extract only changed files, so the graph stays fresh
+#      without manual rebuilds
 install_graphify() {
     if ! command -v graphify >/dev/null 2>&1; then
         echo "  [skip] graphify CLI not found. Install it first:"
@@ -437,15 +446,28 @@ install_graphify() {
         echo "         then re-run: blackcat --graphify"
         return 0
     fi
-    echo "  [run] graphify install --project"
+    echo "  [1/3] skill: graphify install --project"
     if (cd "$TARGET" && graphify install --project --platform claude >/dev/null 2>&1) \
        || (cd "$TARGET" && graphify install --project >/dev/null 2>&1); then
-        echo "  [ok] graphify skill installed into the project"
-        echo "       Build the graph once from inside Claude Code with: /graphify ."
+        echo "        [ok]"
     else
-        echo "  [error] graphify install failed -- run it manually inside the project:"
-        echo "          graphify install --project"
+        echo "        [error] run manually inside the project: graphify install --project"
     fi
+    echo "  [2/3] graph-first nudge: graphify claude install"
+    if (cd "$TARGET" && graphify claude install >/dev/null 2>&1); then
+        echo "        [ok] CLAUDE.md instructions + PreToolUse hook wired"
+    else
+        echo "        [error] run manually inside the project: graphify claude install"
+        echo "                (without this the assistant will NOT use the graph automatically)"
+    fi
+    echo "  [3/3] auto-rebuild on commit: graphify hook install"
+    if (cd "$TARGET" && graphify hook install >/dev/null 2>&1); then
+        echo "        [ok] git hooks installed -- graph re-extracts changed files on commit"
+    else
+        echo "        [error] run manually inside the project: graphify hook install"
+        echo "                (until then, refresh after changes with: graphify update .)"
+    fi
+    echo "  Build the graph once from inside Claude Code with: /graphify ."
 }
 
 if [ "$UPDATE_ONLY" != true ]; then
