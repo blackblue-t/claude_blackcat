@@ -20,6 +20,16 @@
 
 set -e
 
+# When bash.exe is launched directly (non-login, e.g. from install.bat or
+# the blackcat.cmd shim), Git Bash does not put /usr/bin on PATH, so
+# coreutils like dirname, cp and sed are all missing. Re-add them here
+# using bash builtins only -- this must run before any external command.
+for _d in /usr/bin /mingw64/bin /bin; do
+    if [ -d "$_d" ]; then
+        case ":$PATH:" in *":$_d:"*) ;; *) PATH="$_d:$PATH" ;; esac
+    fi
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 GLOBAL_SRC="$SCRIPT_DIR/global"

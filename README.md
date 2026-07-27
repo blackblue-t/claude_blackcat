@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.6**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.7**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -219,6 +219,7 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.7** | 2026-07-27 | 修 Windows shim 執行失敗：非 login 啟動的 Git Bash 沒有 /usr/bin，安裝腳本開頭改用純 builtin 自補 PATH |
 | **v26.7.6** | 2026-07-27 | 安裝改為「先清後裝」：舊版裝入 `~/.claude` 的管理項目（含 copy 模式的實體目錄）備份後移除，非本 repo 內容不動；install.sh / install-project.sh 全面英文化（避免 cmd 的 UTF-8 解析 bug） |
 | **v26.7.5** | 2026-07-27 | 修復 install.bat 中文字元導致 cmd 解析錯位（改純 ASCII，PATH 才能正確寫入）；Windows 增設 `blackcat.cmd` 供 PowerShell 使用（`cat` 被 Get-Content 別名佔用） |
 | **v26.7.4** | 2026-07-27 | 修復 Windows 安裝：install.bat 與 cat.cmd 明確使用 Git Bash 完整路徑（避免抓到 System32 的 WSL bash 而報「沒有已安裝的發佈」） |
