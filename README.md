@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.7**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.8**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -46,6 +46,7 @@ bash install.sh     # 建立 blackcat 指令；把 ~/.claude/bin 加進 PATH
 blackcat --lean       :: 快速迭代工作流
 blackcat --strict     :: 正式產品工作流
 blackcat --writing    :: 疊加寫作組合（可配任一 preset）
+blackcat --rules python  :: 加裝編碼規範（common + 指定語言，經 CLAUDE.md @import 接進 prompt）
 blackcat --taskmaster :: 加裝 TaskMaster
 blackcat --list       :: 看全部選項
 blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
@@ -190,7 +191,7 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 **Hooks**：v26.7.3 起全域**零 hooks**。agent-monitor 移至 project-template（`--taskmaster` 時隨專案安裝）；舊版 25+ 個 ECC hooks 已於 v26.7.1 移除。回滾看 git history。
 
-**Rules**：22 個編碼規範文件（common 9 + python/typescript/rust）移到 repo 根目錄 `rules/` 當參考文件庫，不再自動安裝。
+**Rules**：24 個編碼規範文件（common 9 + python/typescript/rust 各 5），用 `blackcat --rules python` 選裝進專案。注意 **Claude Code 不會自動載入 rules 目錄**——安裝器會把規範複製進專案 `.claude/rules/` 並在專案 CLAUDE.md 附加一段帶標記的 `@import` 區塊（原生 memory import 機制），這才是規範真正進入 startup prompt 的接線。重跑不會重複附加；每個 import 的檔案都吃 context，按專案需要選裝。
 
 **環境變數**：
 
@@ -219,6 +220,7 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.8** | 2026-07-27 | rules 正式接線：新增 `--rules` 選項（複製進專案 `.claude/rules/` + CLAUDE.md 帶標記 `@import` 區塊，冪等）；修正 rules/README.md 過時安裝說明（參考 claw-code 的 rules 自動載入設計，改用 Claude Code 原生 memory import 實現） |
 | **v26.7.7** | 2026-07-27 | 修 Windows shim 執行失敗：非 login 啟動的 Git Bash 沒有 /usr/bin，安裝腳本開頭改用純 builtin 自補 PATH |
 | **v26.7.6** | 2026-07-27 | 安裝改為「先清後裝」：舊版裝入 `~/.claude` 的管理項目（含 copy 模式的實體目錄）備份後移除，非本 repo 內容不動；install.sh / install-project.sh 全面英文化（避免 cmd 的 UTF-8 解析 bug） |
 | **v26.7.5** | 2026-07-27 | 修復 install.bat 中文字元導致 cmd 解析錯位（改純 ASCII，PATH 才能正確寫入）；Windows 增設 `blackcat.cmd` 供 PowerShell 使用（`cat` 被 Get-Content 別名佔用） |

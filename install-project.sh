@@ -11,8 +11,14 @@
 #   bash install-project.sh <project-path> --writing    # add writing pack: speak-human-tw + humanizer (stacks on any preset)
 #   bash install-project.sh <project-path> --all        # install everything
 #   bash install-project.sh <project-path> --skills a,b --commands x,y --agents m,n
+#   bash install-project.sh <project-path> --rules python    # coding rules (common + language sets)
 #   bash install-project.sh <project-path> --taskmaster # add TaskMaster workflow (project-template)
 #   bash install-project.sh --list                      # list available items
+#
+# --rules copies rule files into <project>/.claude/rules/ AND writes a marked
+# @-import block into the project's CLAUDE.md. Claude Code does NOT auto-load
+# rules directories -- files only reach the system prompt when CLAUDE.md
+# imports them, so the import block is what actually wires them up.
 #
 # Default preset (no flags) is --lean.
 # lean and strict are intentionally exclusive: ponytail ("one minimal check
@@ -52,12 +58,15 @@ list_items() {
         fi
         echo ""
     done
+    echo "-- rules (via --rules; common always included) --"
+    ls "$SCRIPT_DIR/rules" | grep -v 'README' | grep -v '^common$'
+    echo ""
     echo "-- extras --"
     echo "--taskmaster  (project-template: TaskMaster hooks + settings + coordination)"
 }
 
 if [ "$1" = "--list" ] || [ -z "$1" ]; then
-    echo "Usage: bash install-project.sh <project-path> [--lean|--strict|--all] [--writing] [--taskmaster] [--skills a,b] [--commands x,y] [--agents m,n] [--output-styles p,q]"
+    echo "Usage: bash install-project.sh <project-path> [--lean|--strict|--all] [--writing] [--taskmaster] [--rules lang1,lang2] [--skills a,b] [--commands x,y] [--agents m,n] [--output-styles p,q]"
     echo ""
     echo "  --lean     fast-iteration preset: $LEAN_SKILLS (default)"
     echo "  --strict   production preset:     $STRICT_SKILLS"
@@ -77,6 +86,7 @@ DEST="$TARGET/.claude"
 ALL=false
 TASKMASTER=false
 WRITING=false
+RULES=""
 PRESET="lean"
 SKILLS=""
 COMMANDS=""
@@ -90,6 +100,7 @@ while [ $# -gt 0 ]; do
         --strict) PRESET="strict" ;;
         --writing) WRITING=true ;;
         --taskmaster) TASKMASTER=true ;;
+        --rules) RULES="${2//,/ }"; shift ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
         --commands) COMMANDS="${2//,/ }"; shift ;;
         --agents) AGENTS="${2//,/ }"; shift ;;
@@ -147,6 +158,46 @@ install_md() {
 for c in $COMMANDS; do install_md commands "$c"; done
 for a in $AGENTS; do install_md agents "$a"; done
 for o in $STYLES; do install_md output-styles "$o"; done
+
+if [ -n "$RULES" ]; then
+    echo ""
+    echo "[rules] installing rule sets: common $RULES"
+    for r in common $RULES; do
+        src="$SCRIPT_DIR/rules/$r"
+        if [ ! -d "$src" ]; then echo "  [skip] rules/$r (not found)"; continue; fi
+        if [ -d "$DEST/rules/$r" ]; then echo "  [keep] rules/$r (already exists)"; continue; fi
+        mkdir -p "$DEST/rules"
+        cp -r "$src" "$DEST/rules/$r"
+        echo "  [copy] rules/$r"
+    done
+    # Claude Code does not auto-load rules directories. The files above only
+    # reach the system prompt if the project's CLAUDE.md @-imports them, so
+    # append a marked import block (skipped if the marker already exists;
+    # existing CLAUDE.md content is never modified).
+    CMD_FILE="$TARGET/CLAUDE.md"
+    MARK="<!-- blackcat:rules -->"
+    if [ -f "$CMD_FILE" ] && grep -qF "$MARK" "$CMD_FILE"; then
+        echo "  [keep] CLAUDE.md import block (marker already present)"
+    else
+        {
+            [ -f "$CMD_FILE" ] && echo ""
+            echo "$MARK"
+            echo "<!-- Coding rules installed by claude_blackcat. Claude Code only"
+            echo "     loads these because they are @-imported below. To drop a rule,"
+            echo "     delete its line; to drop them all, delete this block. -->"
+            for r in common $RULES; do
+                [ -d "$DEST/rules/$r" ] || continue
+                for f in "$DEST/rules/$r"/*.md; do
+                    [ -f "$f" ] || continue
+                    base="${f##*/}"
+                    [ "$base" = "README.md" ] && continue
+                    echo "@.claude/rules/$r/$base"
+                done
+            done
+        } >> "$CMD_FILE"
+        echo "  [add] @-import block -> $CMD_FILE"
+    fi
+fi
 
 if [ "$TASKMASTER" = true ]; then
     echo ""

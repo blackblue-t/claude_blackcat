@@ -5,62 +5,61 @@ Rules are organized into a **common** layer plus **language-specific** directori
 
 ```
 rules/
-├── common/          # Language-agnostic principles (always install)
-│   ├── coding-style.md
-│   ├── git-workflow.md
-│   ├── testing.md
-│   ├── performance.md
-│   ├── patterns.md
-│   ├── hooks.md
+├── common/          # Language-agnostic principles (always installed with --rules)
 │   ├── agents.md
-│   └── security.md
+│   ├── coding-style.md
+│   ├── development-workflow.md
+│   ├── git-workflow.md
+│   ├── hooks.md
+│   ├── patterns.md
+│   ├── performance.md
+│   ├── security.md
+│   └── testing.md
 ├── typescript/      # TypeScript/JavaScript specific
 ├── python/          # Python specific
-├── golang/          # Go specific
-├── swift/           # Swift specific
-└── php/             # PHP specific
+└── rust/            # Rust specific
 ```
 
 - **common/** contains universal principles — no language-specific code examples.
 - **Language directories** extend the common rules with framework-specific patterns, tools, and code examples. Each file references its common counterpart.
 
+## How rules reach the model
+
+**Claude Code does NOT auto-load rules directories.** Dropping files into
+`~/.claude/rules/` or `.claude/rules/` does nothing by itself — a rule file
+only enters the system prompt when a `CLAUDE.md` imports it with the native
+`@path/to/file.md` syntax.
+
 ## Installation
 
-### Option 1: Install Script (Recommended)
+Use the project installer (`blackcat` shim or `install-project.sh` directly):
 
 ```bash
-# Install common + one or more language-specific rule sets
-./install.sh typescript
-./install.sh python
-./install.sh golang
-./install.sh swift
-./install.sh php
+# From inside the target project:
+blackcat --rules python              # common + python
+blackcat --lean --rules typescript   # combine with any preset
 
-# Install multiple languages at once
-./install.sh typescript python
+# Or explicitly:
+bash install-project.sh <project-path> --rules python,rust
 ```
 
-### Option 2: Manual Installation
+This does two things:
+
+1. Copies `rules/common/` plus each requested language set into the
+   project's `.claude/rules/` (existing directories are kept untouched).
+2. Appends a marked `@`-import block to the project's `CLAUDE.md`
+   (creating the file if needed). The marker (`<!-- blackcat:rules -->`)
+   makes the step idempotent — re-running never duplicates the block, and
+   existing CLAUDE.md content is never modified.
+
+To drop a single rule, delete its `@` line from CLAUDE.md; to drop them
+all, delete the whole marked block. Note that every imported file consumes
+context in every session — install only the sets the project needs.
 
 > **Important:** Copy entire directories — do NOT flatten with `/*`.
-> Common and language-specific directories contain files with the same names.
-> Flattening them into one directory causes language-specific files to overwrite
-> common rules, and breaks the relative `../common/` references used by
-> language-specific files.
-
-```bash
-# Install common rules (required for all projects)
-cp -r rules/common ~/.claude/rules/common
-
-# Install language-specific rules based on your project's tech stack
-cp -r rules/typescript ~/.claude/rules/typescript
-cp -r rules/python ~/.claude/rules/python
-cp -r rules/golang ~/.claude/rules/golang
-cp -r rules/swift ~/.claude/rules/swift
-cp -r rules/php ~/.claude/rules/php
-
-# Attention ! ! ! Configure according to your actual project requirements; the configuration here is for reference only.
-```
+> Common and language-specific directories contain files with the same names,
+> and language-specific files reference their common counterparts via
+> relative `../common/` links.
 
 ## Rules vs Skills
 
@@ -71,9 +70,9 @@ Language-specific rule files reference relevant skills where appropriate. Rules 
 
 ## Adding a New Language
 
-To add support for a new language (e.g., `rust/`):
+To add support for a new language (e.g., `golang/`):
 
-1. Create a `rules/rust/` directory
+1. Create a `rules/golang/` directory
 2. Add files that extend the common rules:
    - `coding-style.md` — formatting tools, idioms, error handling patterns
    - `testing.md` — test framework, coverage tools, test organization
@@ -91,7 +90,7 @@ To add support for a new language (e.g., `rust/`):
 When language-specific rules and common rules conflict, **language-specific rules take precedence** (specific overrides general). This follows the standard layered configuration pattern (similar to CSS specificity or `.gitignore` precedence).
 
 - `rules/common/` defines universal defaults applicable to all projects.
-- `rules/golang/`, `rules/python/`, `rules/swift/`, `rules/php/`, `rules/typescript/`, etc. override those defaults where language idioms differ.
+- `rules/python/`, `rules/rust/`, `rules/typescript/`, etc. override those defaults where language idioms differ.
 
 ### Example
 
