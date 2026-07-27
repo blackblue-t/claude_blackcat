@@ -94,8 +94,10 @@ if [ "$OS_TYPE" = "windows" ]; then
         REPO_WIN="$(cygpath -m "$SCRIPT_DIR")"
     fi
     printf '@echo off\r\nset "P=%%cd:\\=/%%"\r\n"%s" "%s/install-project.sh" "%%P%%" %%*\r\n' "$BASH_EXE" "$REPO_WIN" > "$BIN_DIR/cat.cmd"
+    # PowerShell 的 cat 是 Get-Content 別名會搶走指令，另備 blackcat 給 PowerShell 用
+    cp "$BIN_DIR/cat.cmd" "$BIN_DIR/blackcat.cmd"
     echo ""
-    echo "✅ 已建立 cat 指令：$BIN_DIR/cat.cmd"
+    echo "✅ 已建立指令：cat（cmd 用）、blackcat（PowerShell 用）→ $BIN_DIR"
     echo "   （install.bat 會自動把 %USERPROFILE%\\.claude\\bin 加入 PATH）"
 else
     # macOS/Linux 的 cat 是系統指令不能覆蓋，改叫 blackcat
@@ -113,8 +115,9 @@ echo "│  ✅ 安裝完成！                          │"
 echo "│  備份位置: $BACKUP_DIR"
 echo "│                                         │"
 echo "│  之後在專案目錄執行：                   │"
-echo "│    cat --lean     （Windows cmd）       │"
-echo "│    blackcat --lean（macOS/Linux）       │"
+echo "│    cat --lean      （Windows cmd）      │"
+echo "│    blackcat --lean （PowerShell/macOS/  │"
+echo "│                      Linux）            │"
 echo "╰─────────────────────────────────────────╯"
 
 # jq 檢查（statusline 必需）

@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.4**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.5**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -39,7 +39,7 @@ bash install.sh     # 建立 blackcat 指令；把 ~/.claude/bin 加進 PATH
 全域裝完後，`cd` 到任何專案目錄：
 
 ```bat
-cat --lean       :: 快速迭代工作流（Windows cmd；macOS/Linux 用 blackcat --lean）
+cat --lean       :: 快速迭代工作流
 cat --strict     :: 正式產品工作流
 cat --writing    :: 疊加寫作組合（可配任一 preset）
 cat --taskmaster :: 加裝 TaskMaster
@@ -47,7 +47,13 @@ cat --list       :: 看全部選項
 cat --skills django-tdd --agents python-reviewer   :: 手動指定
 ```
 
-（`cat` 只是 `install-project.sh` 的捷徑，把當前目錄當目標專案；直接跑 `bash install-project.sh <專案路徑> ...` 效果相同）
+| 環境 | 指令 |
+|:--|:--|
+| Windows cmd | `cat --lean` 或 `blackcat --lean` 都可 |
+| **PowerShell** | `blackcat --lean`（`cat` 被內建的 Get-Content 別名佔用） |
+| macOS / Linux | `blackcat --lean`（`cat` 是系統指令） |
+
+（都是 `install-project.sh` 的捷徑，把當前目錄當目標專案；直接跑 `bash install-project.sh <專案路徑> ...` 效果相同。想在 PowerShell 直接用 `cat`，可在 `$PROFILE` 加 `Remove-Item Alias:cat -Force`）
 
 | Preset | 適用 | Skills | Commands |
 |:--|:--|:--|:--|
@@ -213,6 +219,7 @@ cat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.5** | 2026-07-27 | 修復 install.bat 中文字元導致 cmd 解析錯位（改純 ASCII，PATH 才能正確寫入）；Windows 增設 `blackcat.cmd` 供 PowerShell 使用（`cat` 被 Get-Content 別名佔用） |
 | **v26.7.4** | 2026-07-27 | 修復 Windows 安裝：install.bat 與 cat.cmd 明確使用 Git Bash 完整路徑（避免抓到 System32 的 WSL bash 而報「沒有已安裝的發佈」） |
 | **v26.7.3** | 2026-07-27 | 一鍵化：新增 `install.bat`（Windows 雙擊安裝 + 自動加 PATH）與 `cat`/`blackcat` 專案安裝指令；全域縮到只剩 settings + statusline（零 hooks）；rules 移為根目錄參考庫 |
 | **v26.7.2** | 2026-07-27 | 新增寫作組合：speak-human-tw v1.4.0 + humanizer v2.9.1、`--writing` 疊加選項；README 全面改寫並導入版號制 |
