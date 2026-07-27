@@ -55,10 +55,13 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # preset bundles
-LEAN_SKILLS="ponytail ponytail-review"
-LEAN_COMMANDS="plan review-code save-session"
-STRICT_SKILLS="tdd-workflow verification-loop"
-STRICT_COMMANDS="plan tdd verify review-code save-session"
+# worklog + commit are in both presets: they carry the model-routing relay
+# (plan on Fable -> execute on the session model writing .claude/worklog.md
+# -> review-code on Fable reads only that scope -> commit on sonnet).
+LEAN_SKILLS="ponytail ponytail-review worklog"
+LEAN_COMMANDS="plan review-code commit save-session"
+STRICT_SKILLS="tdd-workflow verification-loop worklog"
+STRICT_COMMANDS="plan tdd verify review-code commit save-session"
 WRITING_SKILLS="speak-human-tw humanizer"
 
 list_items() {

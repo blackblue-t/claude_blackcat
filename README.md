@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.10**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.11**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -67,6 +67,21 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 > lean 和 strict **刻意互斥**：ponytail 的「測試留最小 check」和 tdd-workflow 的「強制 80% 覆蓋率」觸發條件相同、指令互相矛盾，同裝會讓行為不可預測。要混用請自行 `--skills` 指定。`--writing` 則跟兩者都不衝突（不同場域）。
 
 裝完把專案的 `.claude/` 提交進該專案的 git。
+
+### 模型路由
+
+三段分工：**規劃/審查用 Fable 5、執行用 Opus、機械收尾用 Sonnet**。模型設定集中在三個位置，要調整（例如未來降級成「規劃 Opus、執行 Sonnet」）只改這幾個值再 `blackcat --update` 同步各專案：
+
+| 位置 | 現值 | 管什麼 |
+|:--|:--|:--|
+| `global/settings.json` 的 `"model"` | `opus` | 主迴圈（執行階段） |
+| `commands/plan.md` frontmatter | `claude-fable-5` | /plan 規劃 |
+| `commands/review-code.md` frontmatter | `claude-fable-5` | /review-code 審查 |
+| `commands/commit.md` frontmatter | `sonnet` | /commit 提交 |
+
+執行 → 審查 → 提交靠 **worklog 接力**：執行時 worklog skill 把每個變更（動了哪些檔、做了什麼、驗證結果）追加到專案的 `.claude/worklog.md`；`/review-code` **只讀 worklog + 列出檔案的 git diff**（不掃全專案，Fable 的錢花在刀口上），結論寫回 worklog；`verdict: pass` 後 `/commit` 用 Sonnet 只 stage 紀錄過的檔案、寫 commit message、提交並歸檔 worklog。worklog skill 與 `/commit` 已加入 lean/strict 兩個 preset。
+
+> Fable 5 是 Opus 之上的模型級別、單價較高，所以只配給規劃與審查；用之前先在 CLI 打 `/model` 確認你的方案看得到 `claude-fable-5`，看不到就把兩個 frontmatter 降回 `opus`。
 
 ### 更新機制
 
@@ -253,6 +268,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.11** | 2026-07-27 | 模型路由：/plan 與 /review-code 用 Fable 5、主迴圈 Opus、/commit（新指令）用 Sonnet；新增 worklog skill 讓執行紀錄接力給審查（review 只看 worklog 範圍不掃全庫）；兩者進 lean/strict preset |
 | **v26.7.10** | 2026-07-27 | 新增更新機制：每次 `blackcat` 結尾比對已裝項目與 repo 版本、互動詢問要更新哪些；`blackcat --update` 純更新模式一次刷新全部差異 |
 | **v26.7.9** | 2026-07-27 | 規範改互動選裝：`blackcat` 安裝結尾跳出規範選單（語言組合 + 9 條 common 各附一句說明，可逐條挑）；新增 `--no-rules`；非互動環境自動跳過 |
 | **v26.7.8** | 2026-07-27 | rules 正式接線：新增 `--rules` 選項（複製進專案 `.claude/rules/` + CLAUDE.md 帶標記 `@import` 區塊，冪等）；修正 rules/README.md 過時安裝說明（參考 claw-code 的 rules 自動載入設計，改用 Claude Code 原生 memory import 實現） |

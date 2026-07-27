@@ -1,6 +1,9 @@
 ---
 description: 重述需求、評估風險、建立逐步實作計畫。確認後存檔到 .claude/plans/，供 /tdd 與後續 session 接續。
+model: claude-fable-5
 ---
+<!-- 模型路由：規劃用 Fable 5（最強推理只花在計劃階段）。
+     要降級改這裡的 model: 即可，例如 model: opus。總表見 README「模型路由」。 -->
 
 # 規劃指令
 
