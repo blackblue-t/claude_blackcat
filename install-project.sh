@@ -7,6 +7,7 @@
 # 用法:
 #   bash install-project.sh <專案路徑> --lean                 # 快速迭代：ponytail 系（YAGNI 最小可行）
 #   bash install-project.sh <專案路徑> --strict               # 正式產品：tdd-workflow + verification-loop
+#   bash install-project.sh <專案路徑> --writing              # 加裝寫作組合：speak-human-tw + humanizer（可疊加在任一 preset 上）
 #   bash install-project.sh <專案路徑> --all                  # 安裝全部
 #   bash install-project.sh <專案路徑> --skills a,b --commands x,y --agents m,n
 #   bash install-project.sh <專案路徑> --taskmaster           # 加裝 TaskMaster 工作流（project-template）
@@ -23,9 +24,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # preset 組合
 LEAN_SKILLS="ponytail ponytail-review"
-LEAN_COMMANDS="plan review-code"
+LEAN_COMMANDS="plan review-code save-session"
 STRICT_SKILLS="tdd-workflow verification-loop"
-STRICT_COMMANDS="plan tdd verify review-code"
+STRICT_COMMANDS="plan tdd verify review-code save-session"
+WRITING_SKILLS="speak-human-tw humanizer"
 
 list_items() {
     local kind
@@ -45,8 +47,9 @@ list_items() {
 if [ "$1" = "--list" ] || [ -z "$1" ]; then
     echo "用法: bash install-project.sh <專案路徑> [--lean|--strict|--all] [--taskmaster] [--skills a,b] [--commands x,y] [--agents m,n] [--output-styles p,q]"
     echo ""
-    echo "  --lean    快速迭代 preset：$LEAN_SKILLS（預設）"
-    echo "  --strict  正式產品 preset：$STRICT_SKILLS"
+    echo "  --lean     快速迭代 preset：$LEAN_SKILLS（預設）"
+    echo "  --strict   正式產品 preset：$STRICT_SKILLS"
+    echo "  --writing  寫作組合（可疊加）：$WRITING_SKILLS"
     echo ""
     list_items
     exit 0
@@ -61,6 +64,7 @@ DEST="$TARGET/.claude"
 
 ALL=false
 TASKMASTER=false
+WRITING=false
 PRESET="lean"
 SKILLS=""
 COMMANDS=""
@@ -72,6 +76,7 @@ while [ $# -gt 0 ]; do
         --all) ALL=true ;;
         --lean) PRESET="lean" ;;
         --strict) PRESET="strict" ;;
+        --writing) WRITING=true ;;
         --taskmaster) TASKMASTER=true ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
         --commands) COMMANDS="${2//,/ }"; shift ;;
@@ -96,6 +101,11 @@ else
         [ "$PRESET" = "strict" ] && COMMANDS="$STRICT_COMMANDS" || COMMANDS="$LEAN_COMMANDS"
     fi
     echo "🎛️  preset: $PRESET"
+fi
+
+if [ "$WRITING" = true ] && [ "$ALL" != true ]; then
+    SKILLS="$SKILLS $WRITING_SKILLS"
+    echo "✍️  writing 組合：$WRITING_SKILLS"
 fi
 
 mkdir -p "$DEST"

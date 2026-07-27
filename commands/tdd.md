@@ -6,6 +6,14 @@ description: 強制執行測試驅動開發工作流。先建立介面、先產�
 
 此指令呼叫 **tdd-guide** agent 來強制執行測試驅動開發方法論。
 
+## 計畫接續（開始前先做）
+
+1. 掃描 `.claude/plans/` 中 `status: active` 的計畫
+2. 找到 → 顯示計畫與 `current_phase`，從該階段接續；該階段的驗收條件就是 RED 測試目標
+3. 沒找到且任務不小（≥2 個檔案或預估 ≥1 小時）→ 建議先跑 `/plan`
+4. 每完成一個階段：勾掉該階段、更新 `current_phase` 與 `updated`
+5. 最後一個階段完成 → 提示執行 `/verify`（由它把 status 改為 done）
+
 ## 功能說明
 
 1. **建立介面** - 先定義 type/interface
