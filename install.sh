@@ -20,6 +20,16 @@
 
 set -e
 
+# When bash.exe is launched directly (non-login, e.g. from install.bat or
+# the blackcat.cmd shim), Git Bash does not put /usr/bin on PATH, so
+# coreutils like dirname, cp and sed are all missing. Re-add them here
+# using bash builtins only -- this must run before any external command.
+for _d in /usr/bin /mingw64/bin /bin; do
+    if [ -d "$_d" ]; then
+        case ":$PATH:" in *":$_d:"*) ;; *) PATH="$_d:$PATH" ;; esac
+    fi
+done
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="$HOME/.claude"
 GLOBAL_SRC="$SCRIPT_DIR/global"
@@ -126,13 +136,21 @@ if [ "$OS_TYPE" = "windows" ]; then
     printf '@echo off\r\nset "P=%%cd:\\=/%%"\r\n"%s" "%s/install-project.sh" "%%P%%" %%*\r\n' "$BASH_EXE" "$REPO_WIN" > "$BIN_DIR/blackcat.cmd"
     # "cat" shorthand works in cmd only: PowerShell aliases cat to Get-Content.
     cp "$BIN_DIR/blackcat.cmd" "$BIN_DIR/cat.cmd"
+    # dispatcher runs against the current directory, no path argument needed;
+    # "bcd" is the short alias for terminal use (inside Claude Code use /dispatch)
+    printf '@echo off\r\n"%s" "%s/dispatch.sh" %%*\r\n' "$BASH_EXE" "$REPO_WIN" > "$BIN_DIR/blackcat-dispatch.cmd"
+    cp "$BIN_DIR/blackcat-dispatch.cmd" "$BIN_DIR/bcd.cmd"
     echo "  [ok] blackcat (cmd + PowerShell) and cat (cmd only) -> $BIN_DIR"
+    echo "  [ok] blackcat-dispatch (alias: bcd) -> $BIN_DIR"
     echo "       install.bat adds this folder to your user PATH"
 else
     # "cat" is a system command on macOS/Linux, so the command is blackcat.
     printf '#!/bin/bash\nexec bash "%s/install-project.sh" "$PWD" "$@"\n' "$SCRIPT_DIR" > "$BIN_DIR/blackcat"
     chmod +x "$BIN_DIR/blackcat"
-    echo "  [ok] blackcat -> $BIN_DIR/blackcat"
+    printf '#!/bin/bash\nexec bash "%s/dispatch.sh" "$@"\n' "$SCRIPT_DIR" > "$BIN_DIR/blackcat-dispatch"
+    chmod +x "$BIN_DIR/blackcat-dispatch"
+    cp "$BIN_DIR/blackcat-dispatch" "$BIN_DIR/bcd"
+    echo "  [ok] blackcat, blackcat-dispatch (alias: bcd) -> $BIN_DIR"
     echo "       make sure ~/.claude/bin is on PATH, e.g. add to ~/.bashrc:"
     echo "       export PATH=\"\$HOME/.claude/bin:\$PATH\""
 fi

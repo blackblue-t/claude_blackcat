@@ -1,64 +1,55 @@
 ---
-description: 根據 VibeCoding 模板進行程式碼審查，涵蓋品質、安全、架構合規。
+description: 審查 worklog 記錄的變更範圍（不掃全專案），結論寫回 worklog，通過後交給 /commit。
+model: claude-fable-5
 ---
+<!-- 模型路由：審查用 Fable 5。要降級改這裡的 model: 即可，例如 model: opus。
+     總表見 README「模型路由」。 -->
 
-# 程式碼審查
+# 程式碼審查（worklog 範圍）
 
-## 分析目標
+審查範圍**只來自紀錄，不掃全專案**——這是刻意設計：執行階段
+（worklog skill）已把動過的檔案與意圖記在 `.claude/worklog.md`，
+審查只需要「紀錄 + 這些檔案的 diff」。
 
-分析路徑: $ARGUMENTS（預設為當前目錄）
+## 流程
 
-## 審查項目
+### 1. 決定審查範圍
 
-### 階段 0: 流程合規
-- `01_workflow_manual.md` → 開發流程合規性
+- 讀 `.claude/worklog.md`，取**上次審查（或提交）之後**的所有條目，
+  彙整其 `files:` 清單。
+- **並行任務的紀錄**在 `.claude/worklog.d/*.md`（blackcat-dispatch 的
+  worktree session 各寫一份，合併後一起出現）——全部讀進來，範圍照樣
+  以各檔的 `files:` 彙整。dispatch 合併後的審查基準用
+  `git diff <合併前的 base>...HEAD`。
+- worklog 不存在或沒有新條目時退回 git 範圍：`git status` +
+  `git diff`（含 staged 與未 staged）的變更檔案。兩者都空就回報
+  「沒有可審查的變更」並結束。
+- `$ARGUMENTS` 有給路徑時，把範圍再縮小到該路徑之下。
 
-### 階段 1: 規劃
-- `02_project_brief_and_prd.md` → 需求對齊
-- `03_behavior_driven_development_guide.md` → BDD 覆蓋率
+### 2. 審查
 
-### 階段 2: 架構設計
-- `04_architecture_decision_record_template.md` → ADR 記錄
-- `05_architecture_and_design_document.md` → 系統架構
-- `06_api_design_specification.md` → API 設計合規
+對範圍內每個檔案：讀 worklog 的 did/why 了解意圖，看 `git diff
+<file>` 的實際變更，必要時才打開整個檔案。檢查：
 
-### 階段 3: 詳細設計
-- `07_module_specification_and_tests.md` → 模組規格與測試
-- `08_project_structure_guide.md` → 專案結構
-- `09_file_dependencies_template.md` → 依賴分析
-- `10_class_relationships_template.md` → 類別設計
+- **正確性**：變更是否達成 worklog 宣稱的意圖？有沒有邊界條件、錯誤處理漏洞？
+- **安全**：秘密硬編碼、注入、未驗證輸入。
+- **一致性**：命名、風格是否貼合周邊程式碼；有沒有多餘的複雜度。
+- **驗證缺口**：worklog 標了 `verify: 未驗證` 的條目，指出該補什麼驗證。
 
-### 階段 4: 開發品質
-- `11_code_review_and_refactoring_guide.md` → 審查清單
-- `12_frontend_architecture_specification.md` → 前端架構
-- `17_frontend_information_architecture_template.md` → 前端 IA
+### 3. 結論寫回 worklog
 
-### 階段 5: 安全部署
-- `13_security_and_readiness_checklists.md` → 安全評估
-- `14_deployment_and_operations_guide.md` → 部署策略
+把審查結論**追加**到 `.claude/worklog.md`：
 
-### 階段 6: 維護管理
-- `15_documentation_and_maintenance_guide.md` → 文檔品質
-- `16_wbs_development_plan_template.md` → WBS 追蹤
-
-## 建議 Agent
-
-根據審查結果建議適合的 Agent：
-
-```
-審查結果:
-
-建議的 Agent:
-  [1] code-quality-specialist -- 程式碼品質深度分析
-  [2] security-infrastructure-auditor -- 安全稽核
-  [3] test-automation-engineer -- 測試覆蓋補強
-
-請選擇 (1-3) 或 N 跳過:
+```markdown
+## Review
+- verdict: pass          # 或 needs-fix
+- scope: <審查了哪些檔案>
+- findings:
+  - <嚴重度> <檔案:行> <問題與建議>   # pass 且無發現時寫 none
 ```
 
-## 使用方式
+### 4. 收尾
 
-```
-/review-code              # 審查整個專案
-/review-code src/api/     # 審查特定路徑
-```
+- **pass** → 提醒使用者跑 `/commit` 完成提交。
+- **needs-fix** → 列出待修項；修完後重跑 `/review-code`，新一輪結論
+  會再追加一條 Review 條目。

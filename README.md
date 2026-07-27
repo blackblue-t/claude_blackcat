@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.6**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.17**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -46,7 +46,12 @@ bash install.sh     # 建立 blackcat 指令；把 ~/.claude/bin 加進 PATH
 blackcat --lean       :: 快速迭代工作流
 blackcat --strict     :: 正式產品工作流
 blackcat --writing    :: 疊加寫作組合（可配任一 preset）
+blackcat --rules python  :: 直接指定編碼規範（common 全部 + 指定語言，不經選單）
+blackcat --no-rules   :: 跳過規範選單（CI / 腳本用；非互動環境本來就會自動跳過）
 blackcat --taskmaster :: 加裝 TaskMaster
+blackcat --update     :: 純更新模式：blackcat repo 更新後，刷新專案裡已裝且有變動的項目
+blackcat --graphify   :: 加裝 Graphify 知識圖譜（省 token；需先裝 graphify CLI）
+bcd                   :: 並行任務調度（blackcat-dispatch 的短別名；Claude Code 裡用 /dispatch）
 blackcat --list       :: 看全部選項
 blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 ```
@@ -64,6 +69,86 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 > lean 和 strict **刻意互斥**：ponytail 的「測試留最小 check」和 tdd-workflow 的「強制 80% 覆蓋率」觸發條件相同、指令互相矛盾，同裝會讓行為不可預測。要混用請自行 `--skills` 指定。`--writing` 則跟兩者都不衝突（不同場域）。
 
 裝完把專案的 `.claude/` 提交進該專案的 git。
+
+### 模型路由
+
+三段分工：**規劃/審查用 Fable 5、執行用 Opus、機械收尾用 Sonnet**。
+
+**初始化精靈**：專案**第一次**安裝時（模型路由指令剛被複製進去），安裝器會自動跑模型設定精靈——先用 claude CLI 探測 `claude-fable-5` 是否可用（一次極小的 API 呼叫；不可用時 plan/review 預設自動降為 opus），然後逐階段詢問 plan / review / commit / 主迴圈各用哪個模型（Enter 保留預設、可輸入 1-4 或完整模型 ID）。選擇寫進**該專案的**指令副本與 `.claude/settings.json`，所以每個專案可以路由不同。重跑不會再問；想改用 `blackcat --models` 重開精靈。專案自選的模型受更新機制保護：比對時忽略 model 行、更新時保留專案的選擇。
+
+repo 端的預設值集中在這幾個位置，要整批調整（例如未來降級成「規劃 Opus、執行 Sonnet」）改這幾個值再 `blackcat --update` 同步各專案：
+
+| 位置 | 現值 | 管什麼 |
+|:--|:--|:--|
+| `global/settings.json` 的 `"model"` | `opus` | 主迴圈（執行階段） |
+| `commands/plan.md` frontmatter | `claude-fable-5` | /plan 規劃 |
+| `commands/review-code.md` frontmatter | `claude-fable-5` | /review-code 審查 |
+| `commands/commit.md` frontmatter | `sonnet` | /commit 提交 |
+
+執行 → 審查 → 提交靠 **worklog 接力**：執行時 worklog skill 把每個變更（動了哪些檔、做了什麼、驗證結果）追加到專案的 `.claude/worklog.md`；`/review-code` **只讀 worklog + 列出檔案的 git diff**（不掃全專案，Fable 的錢花在刀口上），結論寫回 worklog；`verdict: pass` 後 `/commit` 用 Sonnet 只 stage 紀錄過的檔案、寫 commit message、提交並歸檔 worklog。worklog skill 與 `/commit` 已加入 lean/strict 兩個 preset。
+
+> Fable 5 是 Opus 之上的模型級別、單價較高，所以只配給規劃與審查；用之前先在 CLI 打 `/model` 確認你的方案看得到 `claude-fable-5`，看不到就把兩個 frontmatter 降回 `opus`。
+
+### 完整開發流程（含並行執行）
+
+```
+user 提需求
+  → /grill（Fable）拷問需求到沒有模糊地帶 → requirements 文件
+  → /plan（Fable）架構 + 任務拆解；獨立且檔案不重疊的任務匯出到 .claude/tasks/
+  → /dispatch（Opus ×N）每個任務一個獨立 worktree + 分支 + headless session
+      （從 main 出發會自動先開 integrate/* 整合分支——main 在審查通過前保持乾淨）
+  → /dispatch --merge 依序把任務分支合進整合分支
+  → 開新 session 跑 /review-code（Fable）——只讀 worklog.d/* + diff，天然跨 session
+  → /commit（Sonnet）：一般路線 = 提交 working tree 變更；
+      並行路線 = 驗 pass 後把整合分支 merge --no-ff 回 main
+  → user check（git log 確認、push 由你決定；並行路線最後 /dispatch --clean）
+```
+
+**為什麼是 worktree 而不是 sub-agent**：sub-agent 的產出全部回堆到主 session 的 context，任務一多就炸，而且每個 sub-agent 要重新讀一遍專案背景。worktree + headless session 是**完全獨立的 context**——互不污染、各自省流，程式碼隔離在各自分支，最後才合併。
+
+**dispatcher 用法**——兩個入口，同一個引擎（`dispatch.sh`）：
+
+- **Claude Code 裡**（推薦）：`/dispatch`。無參數會先 dry-run 給你確認才執行，執行中背景跑並定期回報進度、失敗任務自動摘 log 重點、合併衝突幫你解。參數直通：`/dispatch --max 3`、`/dispatch --merge`。
+- **終端機**：短別名 `bcd`（`blackcat-dispatch` 的縮寫，全平台同名）。
+
+```bash
+bcd --dry-run       # 預覽會跑哪些任務
+bcd                 # 執行全部 pending 任務
+bcd --max 3 --save  # 最大同時 session 數，--save 存進 .claude/dispatch.conf
+bcd --status        # 看任務/分支狀態
+bcd --merge         # 合併完成的任務分支（衝突會停下指路）
+bcd --clean         # 移除 worktree、刪已合併分支
+```
+
+**併發上限**三個層級：`--max N` 單次生效 → 加 `--save` 寫入專案 `.claude/dispatch.conf`（`MAX_PARALLEL=N`，之後預設沿用）→ 都沒設預設 2。conf 還可設 `DISPATCH_MODEL`（任務預設模型，個別任務檔可用 `model:` 覆蓋）與 `DISPATCH_PERMISSIONS`（`acceptEdits` 預設：自動核准檔案編輯，但 git commit 等 Bash 指令要靠專案 permissions 允許；`skip` = `--dangerously-skip-permissions`，worktree 內全自動，只在信任的專案用）。
+
+**安全設計**：任務由 /plan 匯出時強制檔案不重疊、內容自足（headless session 沒有對話上下文）；每個 session 只寫自己的 `.claude/worklog.d/<slug>.md`（合併不衝突）；只 commit 不 push 不 merge；失敗的任務留 log 在 `.claude/dispatch-logs/`。
+
+### Graphify（省 token 選配）
+
+[Graphify](https://github.com/Graphify-Labs/graphify) 用 tree-sitter 在本地把程式碼解析成可查詢的知識圖譜（不打 API），之後 Claude 沿圖找到相關檔案再精準讀取，不用大範圍翻檔案定位——**大型專案（約 500+ 檔案）省最多，小專案建圖成本反而高於節省**，所以是選配不進 preset。
+
+- 前置：`uv tool install graphifyy`（或 `pipx install graphifyy`；PyPI 套件名是雙 y）。
+- 裝法：專案**首次**安裝的互動流程會問一次要不要裝；或隨時 `blackcat --graphify`。
+- **關鍵：完整接線有三層，只裝 skill 是不會省到 token 的**（Claude 不會自動查圖，照樣翻檔案）。blackcat 會三層都裝：
+
+| 層 | 指令 | 作用 |
+|:--|:--|:--|
+| skill | `graphify install --project` | 手動 `/graphify` 查詢能力 |
+| **graph-first** | `graphify claude install` | CLAUDE.md 指示 + PreToolUse hook，在搜尋類工具呼叫前把 Claude 推向圖查詢——**這層才是自動省 token 的來源**（還有 strict 模式可強制） |
+| 自動重建 | `graphify hook install` | git post-commit/checkout hook 增量重建（只重解析變動檔案），**不用手動更新圖** |
+
+- 裝完在 Claude Code 裡跑一次 `/graphify .` 建圖（產出 `graph.json` / `GRAPH_REPORT.md` / `graph.html`）。之後圖靠 git hook 在每次 commit 自動增量更新；沒裝 hook 的話手動 `graphify update .`。
+- 它建立的 `.claude/skills/graphify` 歸 graphify CLI 管——blackcat 的清理與更新機制**刻意不碰**非本 repo 的 skills，互不干擾。
+
+### 更新機制
+
+裝進專案的檔案**永遠不會被靜默覆蓋**（重跑會顯示 `[keep]`）。當你更新了 blackcat repo（`git pull` 或自己改），已裝的專案這樣同步：
+
+- **每次跑 `blackcat`**（任何 preset）結尾都會做更新檢查：比對專案已裝項目與 repo 版本，列出有差異的（skills / rules / commands / agents / output-styles），互動模式下**詢問要更新哪些**（`a` 全更、Enter 跳過、輸入編號挑選）。
+- **`blackcat --update`**：純更新模式——不裝任何新東西，直接刷新所有有差異的項目、不逐項詢問。這是「更新 blackcat repo → 到各專案跑一次」的標準流程。
+- 更新會**覆蓋該項目的本地修改**（提示訊息會先警告），所以專案的 `.claude/` 記得先 commit；非互動環境（CI）只列差異不動手。
+- 小提醒：rules 組合若新增了「新檔案」，更新會複製進來但 CLAUDE.md 的 `@import` 區塊不會自動加行（那是你挑選過的清單），輸出會提示手動補。
 
 ---
 
@@ -190,7 +275,29 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 **Hooks**：v26.7.3 起全域**零 hooks**。agent-monitor 移至 project-template（`--taskmaster` 時隨專案安裝）；舊版 25+ 個 ECC hooks 已於 v26.7.1 移除。回滾看 git history。
 
-**Rules**：22 個編碼規範文件（common 9 + python/typescript/rust）移到 repo 根目錄 `rules/` 當參考文件庫，不再自動安裝。
+**Rules**：24 個編碼規範文件（common 9 + python/typescript/rust 各 5）。注意 **Claude Code 不會自動載入 rules 目錄**——安裝器會把規範複製進專案 `.claude/rules/` 並在專案 CLAUDE.md 附加一段帶標記的 `@import` 區塊（原生 memory import 機制），這才是規範真正進入 startup prompt 的接線。重跑不會重複附加；每個 import 的檔案都吃 context，按專案需要選裝。
+
+裝法有兩種：跑 `blackcat --lean`（或任何 preset）結尾會出現**互動選單**，先問要不要裝（Enter = 不裝），要裝的話列出語言組合與 9 條 common 規範各附一句說明，輸入編號挑選（common 直接 Enter = 全裝、`n` = 不裝）；或用 `--rules python` 直接指定跳過選單。選單只在互動終端機出現，CI / 管線自動靜默跳過，也可用 `--no-rules` 強制關閉：
+
+```
+Add coding rules to CLAUDE.md? [y/N] y
+Language sets (a set imports all 5 of its files):
+  1) python       Python set: style/testing/patterns/hooks/security
+  2) rust         Rust set: style/testing/patterns/hooks/security
+  3) typescript   TypeScript/JS set: style/testing/patterns/hooks/security
+Select sets (numbers separated by spaces, Enter for none): 1
+Common rules (language-agnostic):
+  1) agents.md                when/how to design subagents and delegate work
+  2) coding-style.md          naming, function size, immutability defaults
+  3) development-workflow.md  plan -> implement -> verify working loop
+  4) git-workflow.md          branching, commit messages, PR conventions
+  5) hooks.md                 auto-run formatters/linters via PostToolUse hooks
+  6) patterns.md              preferred design patterns and anti-patterns
+  7) performance.md           measure-before-optimize guidelines
+  8) security.md              secrets, input validation, dependency hygiene
+  9) testing.md               test structure and coverage expectations
+Select common rules (Enter for all, n for none, numbers to pick): 2 9
+```
 
 **環境變數**：
 
@@ -219,6 +326,17 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.17** | 2026-07-27 | 修並行路線收尾：dispatch 從 main 出發自動開 `integrate/*` 整合分支（main 審查前保持乾淨）；/commit 增加並行模式——驗 pass 後把整合分支 merge --no-ff 回 main |
+| **v26.7.16** | 2026-07-27 | 調度改雙入口：新增 `/dispatch` slash command（Claude Code 內用，dry-run 確認、背景執行定期回報、衝突協助）與終端短別名 `bcd`；/dispatch 進 preset |
+| **v26.7.15** | 2026-07-27 | 完整流程落地：新增 /grill（Fable 需求拷問）、/plan 並行任務匯出、`blackcat-dispatch`（worktree 隔離 + headless 並行執行，`--max` 控併發、merge/clean/status 子模式）；worklog.d 並行紀錄機制 |
+| **v26.7.14** | 2026-07-27 | Graphify 改三層完整接線：skill + graph-first（CLAUDE.md 指示與 PreToolUse hook，自動省 token 的來源）+ git hook 自動增量重建；README 說明只裝 skill 沒效果的原因 |
+| **v26.7.13** | 2026-07-27 | 整合 Graphify（選配省 token）：`--graphify` 編排其官方安裝器、首裝互動流程詢問一次；其 skill 歸 graphify CLI 管、不受本 repo 清理/更新機制影響 |
+| **v26.7.12** | 2026-07-27 | 專案初始化模型精靈：首裝自動探測 Fable 5 可用性（不可用降回 opus）並逐階段詢問 plan/review/commit/主迴圈模型；`--models` 重開精靈；更新機制忽略並保留專案自選 model |
+| **v26.7.11** | 2026-07-27 | 模型路由：/plan 與 /review-code 用 Fable 5、主迴圈 Opus、/commit（新指令）用 Sonnet；新增 worklog skill 讓執行紀錄接力給審查（review 只看 worklog 範圍不掃全庫）；兩者進 lean/strict preset |
+| **v26.7.10** | 2026-07-27 | 新增更新機制：每次 `blackcat` 結尾比對已裝項目與 repo 版本、互動詢問要更新哪些；`blackcat --update` 純更新模式一次刷新全部差異 |
+| **v26.7.9** | 2026-07-27 | 規範改互動選裝：`blackcat` 安裝結尾跳出規範選單（語言組合 + 9 條 common 各附一句說明，可逐條挑）；新增 `--no-rules`；非互動環境自動跳過 |
+| **v26.7.8** | 2026-07-27 | rules 正式接線：新增 `--rules` 選項（複製進專案 `.claude/rules/` + CLAUDE.md 帶標記 `@import` 區塊，冪等）；修正 rules/README.md 過時安裝說明（參考 claw-code 的 rules 自動載入設計，改用 Claude Code 原生 memory import 實現） |
+| **v26.7.7** | 2026-07-27 | 修 Windows shim 執行失敗：非 login 啟動的 Git Bash 沒有 /usr/bin，安裝腳本開頭改用純 builtin 自補 PATH |
 | **v26.7.6** | 2026-07-27 | 安裝改為「先清後裝」：舊版裝入 `~/.claude` 的管理項目（含 copy 模式的實體目錄）備份後移除，非本 repo 內容不動；install.sh / install-project.sh 全面英文化（避免 cmd 的 UTF-8 解析 bug） |
 | **v26.7.5** | 2026-07-27 | 修復 install.bat 中文字元導致 cmd 解析錯位（改純 ASCII，PATH 才能正確寫入）；Windows 增設 `blackcat.cmd` 供 PowerShell 使用（`cat` 被 Get-Content 別名佔用） |
 | **v26.7.4** | 2026-07-27 | 修復 Windows 安裝：install.bat 與 cat.cmd 明確使用 Git Bash 完整路徑（避免抓到 System32 的 WSL bash 而報「沒有已安裝的發佈」） |

@@ -1,6 +1,9 @@
 ---
 description: 重述需求、評估風險、建立逐步實作計畫。確認後存檔到 .claude/plans/，供 /tdd 與後續 session 接續。
+model: claude-fable-5
 ---
+<!-- 模型路由：規劃用 Fable 5（最強推理只花在計劃階段）。
+     要降級改這裡的 model: 即可，例如 model: opus。總表見 README「模型路由」。 -->
 
 # 規劃指令
 
@@ -55,6 +58,32 @@ updated: <日期>
 - 階段數依任務調整，小任務一兩個 phase 就好，不硬湊四個
 - 已存在 `status: active` 的計畫時，先提示是否接續，不要疊新計畫
 - 確認前**不寫任何檔案**（包含計畫檔本身）
+- `.claude/plans/` 裡有 `*-requirements.md`（/grill 的產出）時先讀它，需求以它為準
+
+## 並行任務匯出（供 blackcat-dispatch 使用）
+
+計畫中**彼此獨立、檔案不重疊**的任務，經使用者確認後逐一匯出到
+`.claude/tasks/<nn>-<slug>.md`，讓 dispatcher 用獨立 worktree 並行執行：
+
+```yaml
+---
+branch: task/<nn>-<slug>
+files: src/auth.py, tests/test_auth.py   # 這個任務允許動的全部檔案
+model: opus                              # 可省略，用 dispatch 預設
+status: pending
+---
+# 任務：<一句話>
+## 目標與驗收條件
+## 實作提示（必要的背景，讓無上下文的 session 能獨立完成）
+## 驗證指令（可執行）
+```
+
+匯出鐵則：
+
+- **files 不重疊**：任兩個 pending 任務的 files 有交集就不能同時匯出——把有交集的合併成一個任務，或留在計畫裡走一般流程。
+- 每個任務要**自足**：執行它的 session 沒有任何對話上下文，背景知識要寫進任務檔。
+- 有依賴關係的不要匯出（dispatcher 不解依賴），照 phase 順序在主 session 做。
+- 匯出後提示使用者：`blackcat-dispatch --dry-run` 預覽、`blackcat-dispatch` 執行。
 
 ## 重要提醒
 
