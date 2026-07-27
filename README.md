@@ -1,28 +1,13 @@
 # claude_blackcat
 
-**版本：v26.7.2**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.3**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
-個人 Claude Code 設定同步 repo。全域偏好跟人走，工作流跟專案走。
-
----
-
-## 設計想法
-
-這包經歷過一次大整頓：v1 是 ECC + GUNDAM 兩套設定整包抄來疊在一起，同一個概念（例如 TDD）同時存在於 agent、command、output-style、skill 四層，另外還有 25+ 個每次 tool call 都跑的 hooks。v26.7.x 起改為「**理解過、挑過、說得出用途**」的組合，核心理念三條：
-
-1. **全域只放偏好，工作流放專案**（參考 [mattpocock/skills](https://github.com/mattpocock/skills)）
-   `~/.claude/` 只有 settings、statusline、一個 hook、編碼規範——換機器一樣。skills/commands 用 `install-project.sh` **複製**進各專案的 `.claude/`，跟著專案進 git、可針對專案客製、不污染其他專案。
-2. **同一概念只留一層**
-   裝了 tdd-workflow skill 就不要再裝 tdd agent + TDD output-style。裝的時候用 preset 挑，不要 `--all` 全裝。
-3. **記憶進檔案，不留在對話裡**（參考 [bheadwei GUNDAM](https://github.com/bheadwei/claude-GUNDAM-zh-tw)）
-   計畫存 `.claude/plans/`、session 記錄存 `.claude/sessions/`，跨 session 不斷點、失敗過的路不重走。
-
-各思想來源「取了什麼、沒取什麼、為什麼」的完整對照表見 **[WORKFLOW.md](WORKFLOW.md)**。
+個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
 ```
-全域（~/.claude/）：settings(40行) + statusline + agent-monitor + rules   ← 偏好，跟人走
-專案（.claude/）  ：1-4 個 skills + 3-5 個 commands                      ← 工作流，跟專案走
-產出（.claude/）  ：plans/ + sessions/                                   ← 記憶，跟專案進 git
+全域（~/.claude/）：settings + statusline + cat 指令        ← 偏好，跟人走
+專案（.claude/）  ：1-4 個 skills + 3-5 個 commands         ← 工作流，跟專案走
+產出（.claude/）  ：plans/ + sessions/                      ← 記憶，跟專案進 git
 ```
 
 ---
@@ -31,24 +16,38 @@
 
 ### 全域（每台機器一次）
 
+**Windows**：clone 後直接雙擊 `install.bat`（或在 cmd 執行）。會自動裝 settings + statusline、建立 `cat` 指令並加入 PATH。需要先裝 [Git for Windows](https://git-scm.com/download/win)。
+
+```bat
+git clone https://github.com/blackblue-t/claude_blackcat.git
+cd claude_blackcat
+install.bat
+```
+
+**macOS / Linux**：
+
 ```bash
 git clone https://github.com/blackblue-t/claude_blackcat.git
 cd claude_blackcat
-bash install.sh          # 自動偵測 OS；Windows 自動用 copy 模式；會清掉舊版全域工作流 symlinks
+bash install.sh     # 建立 blackcat 指令；把 ~/.claude/bin 加進 PATH
 ```
 
-安裝後手動設定：`settings.local.json`（API keys）、`.mcp.json`（每台機器不同）。**不需要安裝 ECC plugin**。
+會自動清掉舊版指向本 repo 的全域工作流 symlinks。安裝後手動設定：`settings.local.json`（API keys）、`.mcp.json`（每台機器不同）。**不需要安裝 ECC plugin**。
 
-### 專案（每個專案挑需要的）
+### 專案（在專案目錄一行搞定）
 
-```bash
-bash install-project.sh --list                       # 看有什麼可裝
-bash install-project.sh ~/code/my-project            # 預設 --lean
-bash install-project.sh ~/code/my-project --strict   # 正式產品
-bash install-project.sh ~/code/my-project --writing  # 疊加寫作組合（可配任一 preset）
-bash install-project.sh ~/code/my-project --taskmaster
-bash install-project.sh ~/code/my-project --skills django-tdd --agents python-reviewer   # 手動指定
+全域裝完後，`cd` 到任何專案目錄：
+
+```bat
+cat --lean       :: 快速迭代工作流（Windows cmd；macOS/Linux 用 blackcat --lean）
+cat --strict     :: 正式產品工作流
+cat --writing    :: 疊加寫作組合（可配任一 preset）
+cat --taskmaster :: 加裝 TaskMaster
+cat --list       :: 看全部選項
+cat --skills django-tdd --agents python-reviewer   :: 手動指定
 ```
+
+（`cat` 只是 `install-project.sh` 的捷徑，把當前目錄當目標專案；直接跑 `bash install-project.sh <專案路徑> ...` 效果相同）
 
 | Preset | 適用 | Skills | Commands |
 |:--|:--|:--|:--|
@@ -183,7 +182,9 @@ bash install-project.sh ~/code/my-project --skills django-tdd --agents python-re
 
 **Statusline**：GUNDAM 版多行彩色（模型 │ context │ 目錄+branch │ 時長 │ 花費 + rate limit 進度條）。需要 `jq`，install.sh 會檢查。
 
-**Hooks**：只剩 `agent-monitor.sh`（spawn subagent 時記 log，bash、零負擔）。舊版 25+ 個 ECC hooks 已於 v26.7.1 全部移除（每次 tool call spawn 2–4 個 node process、flag 系統從未使用、ECC 未裝時整批靜默失敗）；回滾看 git history。
+**Hooks**：v26.7.3 起全域**零 hooks**。agent-monitor 移至 project-template（`--taskmaster` 時隨專案安裝）；舊版 25+ 個 ECC hooks 已於 v26.7.1 移除。回滾看 git history。
+
+**Rules**：22 個編碼規範文件（common 9 + python/typescript/rust）移到 repo 根目錄 `rules/` 當參考文件庫，不再自動安裝。
 
 **環境變數**：
 
@@ -212,6 +213,7 @@ bash install-project.sh ~/code/my-project --skills django-tdd --agents python-re
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.3** | 2026-07-27 | 一鍵化：新增 `install.bat`（Windows 雙擊安裝 + 自動加 PATH）與 `cat`/`blackcat` 專案安裝指令；全域縮到只剩 settings + statusline（零 hooks）；rules 移為根目錄參考庫 |
 | **v26.7.2** | 2026-07-27 | 新增寫作組合：speak-human-tw v1.4.0 + humanizer v2.9.1、`--writing` 疊加選項；README 全面改寫並導入版號制 |
 | **v26.7.1** | 2026-07-27 | 大重構：工作流全域→專案級、install-project.sh 與 lean/strict presets、引入 ponytail、計畫持久化 + /save-session（融合 bheadwei GUNDAM）、移除全部 ECC hooks（settings.json 313→40 行）、WORKFLOW.md |
 | v1 | 2026-07 之前 | ECC + GUNDAM 整包疊加時期 |
