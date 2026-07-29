@@ -547,6 +547,27 @@ install_ui() {
     echo "[ui] installing frontend pack"
     for c in $UI_COMMANDS; do install_md commands "$c"; done
     for a in $UI_AGENTS; do install_md agents "$a"; done
+    # Hallmark (github.com/nutlope/hallmark, MIT): anti-AI-slop design
+    # skill -- 20 themes + 57 slop-test gates. Copied into the project
+    # (own-and-customize); not a repo skill, so blackcat's update/cleanup
+    # mechanisms deliberately ignore it.
+    if [ -d "$DEST/skills/hallmark" ]; then
+        echo "  [keep] skills/hallmark (already installed)"
+    else
+        echo "  [hallmark] fetching nutlope/hallmark (anti-AI-slop design skill)..."
+        _hmtmp="$DEST/.hallmark-tmp"
+        rm -rf "$_hmtmp"
+        if git clone --depth 1 https://github.com/nutlope/hallmark "$_hmtmp" >/dev/null 2>&1 \
+           && [ -d "$_hmtmp/skills/hallmark" ]; then
+            mkdir -p "$DEST/skills"
+            cp -r "$_hmtmp/skills/hallmark" "$DEST/skills/hallmark"
+            echo "  [copy] skills/hallmark (20 themes + slop-test gates)"
+        else
+            echo "  [skip] could not fetch hallmark (offline?). Add later with:"
+            echo "         npx skills add nutlope/hallmark"
+        fi
+        rm -rf "$_hmtmp"
+    fi
     echo "  [note] for design-file sync add the pencil MCP to .mcp.json"
     echo "         (see templates/mcp.json.*.example in the blackcat repo)"
 }

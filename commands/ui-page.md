@@ -36,3 +36,9 @@ description: 前端第三站：深化單一頁面——讀 IA 契約補實作細
 ```
 
 缺項要說明原因。pencil MCP 可用時,以設計稿為視覺基準核對。
+
+**去 AI 味（裝有 hallmark skill 時必走）**：產出前套用 hallmark 的
+slop-test 檢查關——避開 AI 預設審美（紫漸層、通用模板結構、千篇一律
+的 hero 區）;不同頁面該有不同的結構個性,不是同一版型換色。也可用
+hallmark 的 `audit` 幫既有頁面打分、`study` 從使用者給的參考網站萃取
+設計 DNA。
