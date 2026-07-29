@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.20**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.21**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -67,6 +67,8 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 | `--writing`（疊加） | 會產出對外文字的專案 | speak-human-tw、humanizer | — |
 
 > lean 和 strict **刻意互斥**：ponytail 的「測試留最小 check」和 tdd-workflow 的「強制 80% 覆蓋率」觸發條件相同、指令互相矛盾，同裝會讓行為不可預測。要混用請自行 `--skills` 指定。`--writing` 則跟兩者都不衝突（不同場域）。
+>
+> **切換 preset**：直接在專案裡跑另一個 preset 即可——安裝器會偵測衝突並詢問「Switch to strict? [y/N]」，`y` 就把舊 preset 的 skills 移到 `.claude/backups/preset-switch-<時間戳>/` 再裝新的（留下的舊指令檔如 /tdd 無害，只有被呼叫才作用）。非互動環境只警告不動手。
 
 裝完把專案的 `.claude/` 提交進該專案的 git。
 
@@ -351,6 +353,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.21** | 2026-07-29 | preset 切換偵測：在專案上跑另一個 preset 會偵測互斥 skills、詢問後移到 backups 再裝新的（修 lean/strict 並存的矛盾風險） |
 | **v26.7.20** | 2026-07-28 | dispatcher 任務提示詞明確要求遵守專案 skills/rules（strict 專案的並行 session 明確走 TDD）；README 補「站 vs 紀律」心智模型 |
 | **v26.7.19** | 2026-07-28 | 新增 `/go` 一條龍：計畫確認為唯一人工關卡，之後自動執行、headless 跨 session 審查、修復迴圈（≤2 輪）、提交準備；單站指令保留供精細控制 |
 | **v26.7.18** | 2026-07-28 | 依端到端實測修正：dispatcher 權限預設改 skip（acceptEdits 實測卡死）、dry-run 真唯讀、--status 增列實際執行值；新增審查修復迴圈（finding 分級 fix/design/requirement、主 session 修、限縮重審、2 輪上限）；任務模板加完成程序與 Windows 注意事項；/merge 薄包裝；grill 交接指紋 |

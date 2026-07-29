@@ -162,6 +162,50 @@ if [ "$WRITING" = true ] && [ "$ALL" != true ]; then
     echo "[writing] adding: $WRITING_SKILLS"
 fi
 
+# ---- preset switch detection --------------------------------------------
+# lean and strict are mutually exclusive (ponytail says "minimal checks",
+# tdd-workflow says "80%+ coverage" -- both trigger on every coding task).
+# If the OTHER preset's skills are already in the project, offer to move
+# them out before installing this one.
+if [ "$ALL" != true ] && [ "$UPDATE_ONLY" != true ]; then
+    if [ "$PRESET" = "strict" ]; then
+        OTHER_SKILLS="$LEAN_SKILLS"; OTHER_NAME="lean"
+    else
+        OTHER_SKILLS="$STRICT_SKILLS"; OTHER_NAME="strict"
+    fi
+    CONFLICTS=""
+    for s in $OTHER_SKILLS; do
+        case " $SKILLS " in *" $s "*) continue ;; esac   # shared skills are fine
+        [ -d "$DEST/skills/$s" ] && CONFLICTS="$CONFLICTS $s"
+    done
+    if [ -n "$CONFLICTS" ]; then
+        echo ""
+        echo "[preset] CONFLICT: this project has $OTHER_NAME skills installed:$CONFLICTS"
+        echo "         lean and strict are mutually exclusive -- keeping both gives"
+        echo "         the model contradictory instructions on every coding task."
+        if [ -t 0 ]; then
+            printf "Switch to %s? (moves conflicting skills to .claude/backups) [y/N] " "$PRESET"
+            read -r ans || ans=""
+            case "$ans" in
+                y|Y|yes|YES)
+                    BK="$DEST/backups/preset-switch-$(date +%Y%m%d-%H%M%S)"
+                    mkdir -p "$BK"
+                    for s in $CONFLICTS; do
+                        mv "$DEST/skills/$s" "$BK/$s"
+                        echo "  [moved] skills/$s -> $BK"
+                    done
+                    echo "  (leftover $OTHER_NAME-only commands are harmless -- they only run when invoked)"
+                    ;;
+                *)
+                    echo "  [warn] keeping both presets -- behavior will be unpredictable"
+                    ;;
+            esac
+        else
+            echo "         (non-interactive: not touching them -- remove manually or re-run interactively)"
+        fi
+    fi
+fi
+
 mkdir -p "$DEST"
 echo "[target] $DEST"
 
