@@ -568,8 +568,17 @@ install_ui() {
         fi
         rm -rf "$_hmtmp"
     fi
-    echo "  [note] for design-file sync add the pencil MCP to .mcp.json"
-    echo "         (see templates/mcp.json.*.example in the blackcat repo)"
+    # pen CLI (@pencil.dev/cli): headless .pen engine -- agent, MCP tools,
+    # PNG/JPEG/WEBP/PDF export -- no desktop app needed. Auth: pen login.
+    if command -v pen >/dev/null 2>&1; then
+        echo "  [ok] pen CLI detected -- canvas-first flow available"
+        echo "       (.pen mockups + headless PNG export; auth via: pen login)"
+    else
+        echo "  [note] optional canvas-first flow needs the pen CLI:"
+        echo "         npm install -g @pencil.dev/cli   (Node 18+), then: pen login"
+        echo "         MCP wiring: see https://docs.pencil.dev/for-developers/pen-cli"
+        echo "         (the pencil desktop app wires its MCP automatically instead)"
+    fi
 }
 
 if [ "$UPDATE_ONLY" != true ]; then

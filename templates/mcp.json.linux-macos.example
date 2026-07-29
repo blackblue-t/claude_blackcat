@@ -1,6 +1,6 @@
 {
   "_readme": "Copy to your project root as .mcp.json, delete servers you do not use, fill in keys. .mcp.json is machine-specific -- do NOT commit it.",
-  "_pencil_note": "Frontend projects (/ui-style, /ui-page) pair with the pencil MCP for design-file sync -- add its entry here following the official pencil docs for your OS.",
+  "_pencil_note": "Frontend canvas-first flow: npm install -g @pencil.dev/cli (Node 18+), then 'pen login'. The desktop app wires its MCP automatically; for CLI-based MCP wiring copy the exact entry from https://docs.pencil.dev/for-developers/pen-cli into this file.",
   "mcpServers": {
     "github": {
       "command": "npx",
