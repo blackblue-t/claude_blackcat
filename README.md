@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.23**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.24**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -146,7 +146,7 @@ user check：git log 確認、push 由你決定 → /dispatch --clean 收 worktr
   └─ 收尾可跑 /learn：把本次教訓蒸餾進 CLAUDE.md（下個 session 不再踩）
 ```
 
-**前端專案**另有三部曲（初始化時選裝或 `blackcat --ui` 隨時加）：`/ui-style`（問答定風格 → DESIGN.md tokens，**品牌色優先**——給 hex 就生成整套色階、語意 tokens、深色版與 WCAG 對比檢查）→ `/ui-site`（IA 契約 + 路由 stubs）→ `/ui-page <路徑>`（單頁深化，委派 ui-builder agent，附風格合規自檢）。裝 UI pack 時會自動抓 [Hallmark](https://github.com/nutlope/hallmark)（MIT）進專案 `.claude/skills/`——**UI 界的去 AI 味 skill**：20 種主題 + 57 道 slop-test 檢查關，專殺紫漸層和模板臉，另有 `audit`（幫既有頁面打分）與 `study`（從參考網站萃取設計 DNA）。配 pencil MCP 可同步設計稿（見 `templates/mcp.json.*.example`）。
+**前端專案**另有三部曲（初始化時選裝或 `blackcat --ui` 隨時加）：`/ui-style`（問答定風格 → DESIGN.md tokens，**品牌色優先**——給 hex 就生成整套色階、語意 tokens、深色版與 WCAG 對比檢查）→ `/ui-site`（IA 契約 + 路由 stubs）→ `/ui-page <路徑>`（單頁深化，委派 ui-builder agent，附風格合規自檢）。裝 UI pack 時會自動抓 [Hallmark](https://github.com/nutlope/hallmark)（MIT）進專案 `.claude/skills/`——**UI 界的去 AI 味 skill**：20 種主題 + 57 道 slop-test 檢查關，專殺紫漸層和模板臉，另有 `audit`（幫既有頁面打分）與 `study`（從參考網站萃取設計 DNA）。**Pencil**（[pencil.dev](https://pencil.dev)，桌面設計畫布）另外裝：裝好後開 `.pen` 檔即接上 Claude Code——工作模式是「**AI 畫、人調、碼隨稿走**」：Claude 用 MCP 工具在畫布上畫設計稿、你視覺微調、`.pen` 檔就放在 repo 裡與程式碼同步；有 pencil 時 /ui-site、/ui-page 會走畫布先行。**動線驗證**（Figma prototype 的替代）：/ui-site 可產出灰框 HTML 原型——頁面連結真的可點、彈窗真的會開，瀏覽器直接走完整個流程。
 
 **MCP 快速設定**：`templates/mcp.json.windows.example` / `mcp.json.linux-macos.example` 複製到專案根改名 `.mcp.json`、刪掉不用的、填 key 即可（機器特定，勿 commit）。
 
@@ -377,6 +377,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.24** | 2026-07-29 | UI 補動線層：/ui-site 可產灰框 HTML 可點擊原型（Figma prototype 替代，連結真可點、彈窗真會開）；pencil 畫布先行流程寫進 ui-site/ui-page（AI 畫、人調、碼隨稿走） |
 | **v26.7.23** | 2026-07-29 | UI pack 整合 Hallmark（去 AI 味設計 skill，裝 --ui 時自動 clone 進專案）；/ui-style 改品牌色優先（hex → 色階/語意 tokens/深色版/WCAG 檢查）；ui-page 與 ui-builder 接 slop-test 檢查關 |
 | **v26.7.22** | 2026-07-29 | 吸收 GUNDAM 精華五項：/grill 範疇分級（demo/mvp/full）、/spec 文件先行（PRD/BDD）、/learn 持續學習、/verify 與 /commit 計畫歸檔、.mcp.json 分平台範本；dispatcher `--windows` 實體視窗模式（標題 bc-<任務>）；UI 前端三部曲選裝（--ui + 首裝詢問，pencil MCP 配套）；README 工作流全圖定版 |
 | **v26.7.21** | 2026-07-29 | preset 切換偵測：在專案上跑另一個 preset 會偵測互斥 skills、詢問後移到 backups 再裝新的（修 lean/strict 並存的矛盾風險） |
