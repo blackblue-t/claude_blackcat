@@ -3,7 +3,7 @@
 # claude_blackcat project installer
 # COPIES selected skills / commands / agents / output-styles into a target
 # project's .claude/ directory. Copy, not symlink: once installed the files
-# belong to the project and can be customized freely (mattpocock-style).
+# belong to the project and can be customized freely.
 #
 # Usage:
 #   bash install-project.sh <project-path> --lean       # fast iteration: ponytail (YAGNI minimal)

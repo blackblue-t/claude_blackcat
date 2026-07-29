@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.26**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.27**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -322,7 +322,7 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 ## 全域層細節
 
-**Statusline**：GUNDAM 版多行彩色（模型 │ context │ 目錄+branch │ 時長 │ 花費 + rate limit 進度條）。需要 `jq`，install.sh 會檢查。
+**Statusline**：多行彩色（模型 │ context │ 目錄+branch │ 時長 │ 花費 + rate limit 進度條）——把「現在燒多快」常駐在眼前，才會記得省。需要 `jq`，install.sh 會檢查。
 
 **Hooks**：v26.7.3 起全域**零 hooks**。agent-monitor 移至 project-template（`--taskmaster` 時隨專案安裝）；舊版 25+ 個 ECC hooks 已於 v26.7.1 移除。回滾看 git history。
 
@@ -359,17 +359,20 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 ---
 
-## 設定來源
+## 參考來源
 
-| 來源 | 取了什麼 |
-|:--|:--|
-| [mattpocock/skills](https://github.com/mattpocock/skills) | 「工作流進專案、複製可客製」架構理念 |
-| [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)（MIT） | ponytail、ponytail-review |
-| [Raymondhou0917/speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw)（MIT） | speak-human-tw（繁中去 AI 味） |
-| [blader/humanizer](https://github.com/blader/humanizer)（MIT） | humanizer（英文去 AI 味） |
-| [bheadwei/claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw) | 計畫持久化、session 記錄機制 |
-| [GUNDAM](https://github.com/kuanweic/claude-GUNDAM-zh-tw) | TaskMaster、commands、output-styles、statusline |
-| [ECC](https://github.com/affaan-m/everything-claude-code) | agents、部分 skills（已複製進本 repo，不需安裝 plugin） |
+設計過程中參考過的專案（含直接收錄的 MIT 授權內容）：
+
+- [mattpocock/skills](https://github.com/mattpocock/skills)
+- [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)（MIT，已收錄）
+- [bheadwei/claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw)
+- [ultraworkers/claw-code](https://github.com/ultraworkers/claw-code)
+- [nutlope/hallmark](https://github.com/nutlope/hallmark)（MIT，`--ui` 時抓進專案）
+- [Raymondhou0917/speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw)（MIT，已收錄）
+- [blader/humanizer](https://github.com/blader/humanizer)（MIT，已收錄）
+- [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code)
+- [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify)（選配整合）
+- [pencil.dev](https://pencil.dev)（選配整合）
 
 ---
 
@@ -377,6 +380,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.27** | 2026-07-29 | 文件整理：設計說明改為只講設計理由，來源標註集中到「參考來源」一節（含 claw-code、Hallmark、Graphify、pencil）；WORKFLOW.md 開頭改為六條設計原則 |
 | **v26.7.26** | 2026-07-29 | 定前端檔案落點約定：`.pen` 設計稿放 `design/`（進 git、與碼同步），DESIGN.md/IA.md 留 `.claude/ui/`（流程契約），灰框原型即棄 |
 | **v26.7.25** | 2026-07-29 | 接上 pen CLI（@pencil.dev/cli，headless 畫布引擎）：--ui 偵測與安裝指引、/ui-page 新增 CLI 出圖迭代路線（無 GUI 也能畫布先行）、MCP 範本註記更新 |
 | **v26.7.24** | 2026-07-29 | UI 補動線層：/ui-site 可產灰框 HTML 可點擊原型（Figma prototype 替代，連結真可點、彈窗真會開）；pencil 畫布先行流程寫進 ui-site/ui-page（AI 畫、人調、碼隨稿走） |
