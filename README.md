@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.19**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.20**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -105,7 +105,9 @@ repo 端的預設值集中在這幾個位置，要整批調整（例如未來降
   → 提交準備完成 → 你看 git log、決定 push
 ```
 
-`/grill`、`/plan`、`/review-code` 等單站指令保留——要精細控制或補跑某站時用。`/plan` 管「做什麼怎麼拆」，`/tdd` 是實作階段的紀律（測試先行），在 /go 裡屬於執行階段的內部細節，不用再手動呼叫。
+`/grill`、`/plan`、`/review-code` 等單站指令保留——要精細控制或補跑某站時用。
+
+**心智模型：「站」和「紀律」是兩種東西。** 站 = 流程走到哪（grill → plan → 執行 → review → commit）；紀律 = 做的時候怎麼做（tdd-workflow、worklog、ponytail、rules），跟著執行走、不是獨立的站。`/tdd` 屬於紀律——不是「拿去 dispatch」，而是 worktree 是專案完整副本、`.claude/` 的 skills 跟著 checkout 過去，**每個並行 session 自己帶著 TDD 紀律做事**（dispatcher 提示詞明確要求遵守專案 skills/rules）。用 /go 之後紀律自動套用，單站指令只在想插手時存在。
 
 ### 完整開發流程（含並行執行）
 
@@ -349,6 +351,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.20** | 2026-07-28 | dispatcher 任務提示詞明確要求遵守專案 skills/rules（strict 專案的並行 session 明確走 TDD）；README 補「站 vs 紀律」心智模型 |
 | **v26.7.19** | 2026-07-28 | 新增 `/go` 一條龍：計畫確認為唯一人工關卡，之後自動執行、headless 跨 session 審查、修復迴圈（≤2 輪）、提交準備；單站指令保留供精細控制 |
 | **v26.7.18** | 2026-07-28 | 依端到端實測修正：dispatcher 權限預設改 skip（acceptEdits 實測卡死）、dry-run 真唯讀、--status 增列實際執行值；新增審查修復迴圈（finding 分級 fix/design/requirement、主 session 修、限縮重審、2 輪上限）；任務模板加完成程序與 Windows 注意事項；/merge 薄包裝；grill 交接指紋 |
 | **v26.7.17** | 2026-07-27 | 修並行路線收尾：dispatch 從 main 出發自動開 `integrate/*` 整合分支（main 審查前保持乾淨）；/commit 增加並行模式——驗 pass 後把整合分支 merge --no-ff 回 main |

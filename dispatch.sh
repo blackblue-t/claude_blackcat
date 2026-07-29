@@ -260,6 +260,7 @@ launch_task() { # $1=task file
 You are executing ONE isolated task in a dedicated git worktree on branch $branch.
 Read .claude/tasks/$slug.md and execute exactly that task -- nothing else.
 Rules:
+0. Follow this project's installed skills and coding rules (.claude/skills/, CLAUDE.md imports) -- e.g. if tdd-workflow is installed, work test-first.
 1. Only modify files listed in the task's 'files:' line, plus the task file itself and .claude/worklog.d/.
 2. Record your work in .claude/worklog.d/$slug.md (sections: files / did / why / verify), creating the directory if needed.
 3. Run the verification steps listed in the task and record real results.
