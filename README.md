@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.21**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.22**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -111,20 +111,44 @@ repo 端的預設值集中在這幾個位置，要整批調整（例如未來降
 
 **心智模型：「站」和「紀律」是兩種東西。** 站 = 流程走到哪（grill → plan → 執行 → review → commit）；紀律 = 做的時候怎麼做（tdd-workflow、worklog、ponytail、rules），跟著執行走、不是獨立的站。`/tdd` 屬於紀律——不是「拿去 dispatch」，而是 worktree 是專案完整副本、`.claude/` 的 skills 跟著 checkout 過去，**每個並行 session 自己帶著 TDD 紀律做事**（dispatcher 提示詞明確要求遵守專案 skills/rules）。用 /go 之後紀律自動套用，單站指令只在想插手時存在。
 
-### 完整開發流程（含並行執行）
+### 完整開發流程（v26.7.22 定版）
 
 ```
-user 提需求
-  → /grill（Fable）拷問需求到沒有模糊地帶 → requirements 文件
-  → /plan（Fable）架構 + 任務拆解；獨立且檔案不重疊的任務匯出到 .claude/tasks/
-  → /dispatch（Opus ×N）每個任務一個獨立 worktree + 分支 + headless session
-      （從 main 出發會自動先開 integrate/* 整合分支——main 在審查通過前保持乾淨）
-  → /dispatch --merge 依序把任務分支合進整合分支
-  → 開新 session 跑 /review-code（Fable）——只讀 worklog.d/* + diff，天然跨 session
-  → /commit（Sonnet）：一般路線 = 提交 working tree 變更；
-      並行路線 = 驗 pass 後把整合分支 merge --no-ff 回 main
-  → user check（git log 確認、push 由你決定；並行路線最後 /dispatch --clean）
+user 提需求（日常直接 /go，以下是它串起來的全圖）
+  │
+  ▼
+/grill（Fable）第一題永遠是範疇分級 scope: demo / mvp / full
+  │   拷問深度隨 scope 縮放 → requirements 文件（含交接指紋 3-5 條）
+  ▼
+/spec（Fable，依 scope）demo 跳過｜mvp 可選 PRD-lite｜full 建議 PRD+BDD
+  │   規格先於任務拆解，防範疇蔓延
+  ▼
+/plan（Fable）架構 + 拆階段；回報指紋命中數
+  │   獨立且檔案不重疊的任務 → 匯出 .claude/tasks/（含「完成程序」固定段落）
+  │   ⏸ 計畫確認 = /go 全程唯一必停的人工關卡
+  ▼
+執行（Opus）──兩種形態，/go 自動選：
+  │   序列：主 session 直接做（strict 走 TDD 紀律；worklog 記錄每步）
+  │   並行：/dispatch 每任務一個 worktree + 分支 + 獨立 session
+  │         從 main 出發自動開 integrate/* 整合分支（main 審查前不動）
+  │         --windows 開實體終端視窗（標題 bc-<任務>，不搞混、可即時盯）
+  │         → /dispatch --merge 合進整合分支（衝突停下協助解）
+  ▼
+/review-code（Fable，獨立 session——/go 用 headless 自動開）
+  │   只讀 worklog(.d) + 列出檔案的 diff，不掃全庫
+  │   finding 分級：[fix] 主 session 修（修/審分離）→ 限縮重審，上限 2 輪
+  │              [design] 回 /plan｜[requirement] 回 /grill（escalate 必停）
+  ▼
+/commit（Sonnet）驗 pass 才動：審查修復先在整合分支 commit
+  │   → merge --no-ff 回 main → 歸檔 worklog 與完成的計畫/spec（strict 由 /verify 做）
+  ▼
+user check：git log 確認、push 由你決定 → /dispatch --clean 收 worktree
+  └─ 收尾可跑 /learn：把本次教訓蒸餾進 CLAUDE.md（下個 session 不再踩）
 ```
+
+**前端專案**另有三部曲（初始化時選裝或 `blackcat --ui` 隨時加）：`/ui-style`（問答定風格 → DESIGN.md tokens）→ `/ui-site`（IA 契約 + 路由 stubs）→ `/ui-page <路徑>`（單頁深化，委派 ui-builder agent，附風格合規自檢）。配 pencil MCP 可同步設計稿（見 `templates/mcp.json.*.example`）。
+
+**MCP 快速設定**：`templates/mcp.json.windows.example` / `mcp.json.linux-macos.example` 複製到專案根改名 `.mcp.json`、刪掉不用的、填 key 即可（機器特定，勿 commit）。
 
 **為什麼是 worktree 而不是 sub-agent**：sub-agent 的產出全部回堆到主 session 的 context，任務一多就炸，而且每個 sub-agent 要重新讀一遍專案背景。worktree + headless session 是**完全獨立的 context**——互不污染、各自省流，程式碼隔離在各自分支，最後才合併。
 
@@ -353,6 +377,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.22** | 2026-07-29 | 吸收 GUNDAM 精華五項：/grill 範疇分級（demo/mvp/full）、/spec 文件先行（PRD/BDD）、/learn 持續學習、/verify 與 /commit 計畫歸檔、.mcp.json 分平台範本；dispatcher `--windows` 實體視窗模式（標題 bc-<任務>）；UI 前端三部曲選裝（--ui + 首裝詢問，pencil MCP 配套）；README 工作流全圖定版 |
 | **v26.7.21** | 2026-07-29 | preset 切換偵測：在專案上跑另一個 preset 會偵測互斥 skills、詢問後移到 backups 再裝新的（修 lean/strict 並存的矛盾風險） |
 | **v26.7.20** | 2026-07-28 | dispatcher 任務提示詞明確要求遵守專案 skills/rules（strict 專案的並行 session 明確走 TDD）；README 補「站 vs 紀律」心智模型 |
 | **v26.7.19** | 2026-07-28 | 新增 `/go` 一條龍：計畫確認為唯一人工關卡，之後自動執行、headless 跨 session 審查、修復迴圈（≤2 輪）、提交準備；單站指令保留供精細控制 |

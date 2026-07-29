@@ -54,7 +54,7 @@ Ready for PR: [YES/NO]
 
 ## 計畫歸檔
 
-結果為 PASS 且 `.claude/plans/` 有 `status: active` 且所有階段已勾完的計畫 → 把該計畫的 `status` 改為 `done` 並更新 `updated`。FAIL 則不動計畫狀態。
+結果為 PASS 且 `.claude/plans/` 有 `status: active` 且所有階段已勾完的計畫 → 把該計畫的 `status` 改為 `done`、更新 `updated`，然後**移到 `.claude/plans/archive/`**（目錄不存在就建；同名 spec 檔一併歸檔）。FAIL 則不動計畫狀態。
 
 ## 參數
 

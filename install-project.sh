@@ -61,9 +61,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # (plan on Fable -> execute on the session model writing .claude/worklog.md
 # -> review-code on Fable reads only that scope -> commit on sonnet).
 LEAN_SKILLS="ponytail ponytail-review worklog"
-LEAN_COMMANDS="go grill plan dispatch merge review-code commit save-session"
+LEAN_COMMANDS="go grill plan dispatch merge review-code commit learn save-session"
 STRICT_SKILLS="tdd-workflow verification-loop worklog"
-STRICT_COMMANDS="go grill plan dispatch merge tdd verify review-code commit save-session"
+STRICT_COMMANDS="go grill plan spec dispatch merge tdd verify review-code commit learn save-session"
 WRITING_SKILLS="speak-human-tw humanizer"
 
 list_items() {
@@ -111,7 +111,11 @@ UPDATE_ONLY=false
 MODEL_PICK=false
 FORCE_MODELS=false
 GRAPHIFY=false
+UI=false
 PRESET="lean"
+
+UI_COMMANDS="ui-style ui-site ui-page"
+UI_AGENTS="ui-builder"
 SKILLS=""
 COMMANDS=""
 AGENTS=""
@@ -129,6 +133,7 @@ while [ $# -gt 0 ]; do
         --update) UPDATE_ONLY=true ;;
         --models) FORCE_MODELS=true ;;
         --graphify) GRAPHIFY=true ;;
+        --ui) UI=true ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
         --commands) COMMANDS="${2//,/ }"; shift ;;
         --agents) AGENTS="${2//,/ }"; shift ;;
@@ -530,6 +535,33 @@ if [ "$UPDATE_ONLY" != true ]; then
         case "$ans" in
             y|Y|yes|YES) install_graphify ;;
             *) ;;
+        esac
+    fi
+fi
+
+# ------------------------------------------------------------------- ui ----
+# Frontend pack (opt-in; dead weight for backend-only projects):
+# /ui-style -> DESIGN.md tokens, /ui-site -> IA + stubs, /ui-page -> deepen
+# one page via the ui-builder agent. Pencil MCP recommended for design sync.
+install_ui() {
+    echo "[ui] installing frontend pack"
+    for c in $UI_COMMANDS; do install_md commands "$c"; done
+    for a in $UI_AGENTS; do install_md agents "$a"; done
+    echo "  [note] for design-file sync add the pencil MCP to .mcp.json"
+    echo "         (see templates/mcp.json.*.example in the blackcat repo)"
+}
+
+if [ "$UPDATE_ONLY" != true ]; then
+    if [ "$UI" = true ]; then
+        echo ""
+        install_ui
+    elif [ -t 0 ] && [ "$MODEL_PICK" = true ] && [ ! -f "$DEST/commands/ui-style.md" ]; then
+        echo ""
+        printf "[ui] Will this project have a frontend? Install the UI pack (/ui-style /ui-site /ui-page)? [y/N] "
+        read -r ans || ans=""
+        case "$ans" in
+            y|Y|yes|YES) install_ui ;;
+            *) echo "  (add it later any time with: blackcat --ui)" ;;
         esac
     fi
 fi

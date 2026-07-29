@@ -1,0 +1,27 @@
+{
+  "_readme": "Copy to your project root as .mcp.json, delete servers you do not use, fill in keys. Windows wraps npx with cmd /c. .mcp.json is machine-specific -- do NOT commit it.",
+  "_pencil_note": "Frontend projects (/ui-style, /ui-page) pair with the pencil MCP for design-file sync -- add its entry here following the official pencil docs for your OS.",
+  "mcpServers": {
+    "github": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_YOUR_TOKEN_HERE" }
+    },
+    "playwright": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@playwright/mcp@latest"]
+    },
+    "context7": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@upstash/context7-mcp"]
+    },
+    "sequential-thinking": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "memory": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-memory"]
+    }
+  }
+}

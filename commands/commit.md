@@ -44,6 +44,10 @@ staging、commit message、合併回主分支（並行路線）、歸檔——�
    - message: <主旨>
    ```
 
+   同時檢查 `.claude/plans/`：本次工作對應的計畫若所有階段已完成，把
+   `status` 改為 `done` 並連同 spec 檔移到 `.claude/plans/archive/`
+   （strict 專案通常由 /verify 先做掉，這裡是 lean 專案的補位）。
+
 5.5 **提交審查修復**（並行路線、有 `## Fix:` 條目時）：只 stage Fix
    條目 `files:` 列出的檔案，在整合分支上 commit（訊息如
    `fix: review round N fixes`）——修復歷史留在整合分支，main 拿到

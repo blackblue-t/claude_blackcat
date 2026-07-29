@@ -24,7 +24,12 @@ model: sonnet
 
 參數直通：`$ARGUMENTS` 原樣傳給 `blackcat-dispatch`
 （例：`/dispatch --dry-run`、`/dispatch --max 3`、`/dispatch --merge`、
-`/dispatch --status`、`/dispatch --clean`）。
+`/dispatch --status`、`/dispatch --clean`、`/dispatch --windows`）。
+
+`--windows`（或 conf 設 `DISPATCH_WINDOW=1`）：每個任務開一個**實體
+終端視窗**，標題 `bc-<任務slug>`，使用者可即時盯各 session 不會搞混；
+成功自動關窗、失敗留窗待查。用了視窗模式就不必再定期報 log 進度——
+使用者自己看得到，你只需在全部結束後整理結果。
 
 ## 流程
 
