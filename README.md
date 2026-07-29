@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.25**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.26**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -377,6 +377,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.26** | 2026-07-29 | 定前端檔案落點約定：`.pen` 設計稿放 `design/`（進 git、與碼同步），DESIGN.md/IA.md 留 `.claude/ui/`（流程契約），灰框原型即棄 |
 | **v26.7.25** | 2026-07-29 | 接上 pen CLI（@pencil.dev/cli，headless 畫布引擎）：--ui 偵測與安裝指引、/ui-page 新增 CLI 出圖迭代路線（無 GUI 也能畫布先行）、MCP 範本註記更新 |
 | **v26.7.24** | 2026-07-29 | UI 補動線層：/ui-site 可產灰框 HTML 可點擊原型（Figma prototype 替代，連結真可點、彈窗真會開）；pencil 畫布先行流程寫進 ui-site/ui-page（AI 畫、人調、碼隨稿走） |
 | **v26.7.23** | 2026-07-29 | UI pack 整合 Hallmark（去 AI 味設計 skill，裝 --ui 時自動 clone 進專案）；/ui-style 改品牌色優先（hex → 色階/語意 tokens/深色版/WCAG 檢查）；ui-page 與 ui-builder 接 slop-test 檢查關 |

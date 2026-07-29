@@ -19,7 +19,8 @@ description: 前端第三站：深化單一頁面——讀 IA 契約補實作細
 3. **骨架確認**:展示 component tree 與將新增的檔案清單,
    **使用者確認才生成**。
 3.5 **pencil 畫布先行（pencil MCP 或 pen CLI 可用時）**:先用
-   batch_design 把頁面畫成 .pen 設計稿,請使用者調整後確認,以設計稿
+   batch_design 把頁面畫成 .pen 設計稿（落點約定:`design/site.pen`,
+   見 ui-style.md 的表;設計稿進 git）,請使用者調整後確認,以設計稿
    為準實作——「AI 畫、人調、碼隨稿走」。兩種調整方式:
    - 有桌面 app / IDE 擴充 → 使用者直接在畫布上拖拉修改。
    - 只有 pen CLI（headless）→ 用它把 .pen **匯出 PNG** 給使用者看,

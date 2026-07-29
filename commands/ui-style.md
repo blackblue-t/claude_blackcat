@@ -31,6 +31,15 @@ description: 前端第一站：問答定風格，產出 DESIGN.md（色票 token
    - 每項附「怎麼用」的一行程式碼示例（對應偵測到的 CSS 方案）
 4. 提醒：下一步 `/ui-site` 建站點結構,或直接 `/ui-page <路徑>` 做單頁。
 
+## 檔案落點約定（前端三部曲共用）
+
+| 檔案 | 位置 | 進 git? | 性質 |
+|:--|:--|:--|:--|
+| `.pen` 設計稿 | **`design/site.pen`**（大專案可拆 `design/<區域>.pen`） | ✅ | 產品設計源檔，與程式碼同步 |
+| DESIGN.md（tokens） | `.claude/ui/DESIGN.md` | ✅ | 流程契約 |
+| IA.md（資訊架構） | `.claude/ui/IA.md` | ✅ | 流程契約 |
+| 灰框可點原型 | `.claude/ui/prototype/` | ❌（即棄） | 動線驗證用 |
+
 ## 鐵則
 
 - pencil MCP 可用時，用它取得/同步設計稿的 tokens，DESIGN.md 與設計稿
