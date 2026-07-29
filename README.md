@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.18**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.19**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -90,6 +90,22 @@ repo 端的預設值集中在這幾個位置，要整批調整（例如未來降
 > Fable 5 是 Opus 之上的模型級別、單價較高，所以只配給規劃與審查；用之前先在 CLI 打 `/model` 確認你的方案看得到 `claude-fable-5`，看不到就把兩個 frontmatter 降回 `opus`。
 >
 > **驗證路由是否生效**：別問模型「你是誰」——session 系統提示詞不隨斜線指令的 `model:` 更新，自報不可靠（實測結論）。要驗就用外部觀測：`/status`、API 用量紀錄，或 dispatcher stdout 的模型回顯（任務層 `model:` 已實測確證生效）。
+
+### 一條龍：`/go`（日常建議入口）
+
+不想站站手打指令，就用 `/go <你的需求>`——它把整條流程串起來，**唯一必停的人工關卡是計畫確認**（業界共識的關卡位置：計畫錯全錯，其他站都可自動）：
+
+```
+/go 幫我加上匯出 CSV 功能
+  → （需求模糊才問 2-3 題關鍵問題）
+  → 計畫呈現 ⏸ 你確認 ← 唯一必停
+  → 自動執行（有並行任務走 dispatcher，一般任務直接做，strict 走 TDD）
+  → 自動開 headless session 跨 session 審查（不用你開視窗）
+  → needs-fix 自動修 + 限縮重審（上限 2 輪）；escalate 停下找你
+  → 提交準備完成 → 你看 git log、決定 push
+```
+
+`/grill`、`/plan`、`/review-code` 等單站指令保留——要精細控制或補跑某站時用。`/plan` 管「做什麼怎麼拆」，`/tdd` 是實作階段的紀律（測試先行），在 /go 裡屬於執行階段的內部細節，不用再手動呼叫。
 
 ### 完整開發流程（含並行執行）
 
@@ -333,6 +349,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.19** | 2026-07-28 | 新增 `/go` 一條龍：計畫確認為唯一人工關卡，之後自動執行、headless 跨 session 審查、修復迴圈（≤2 輪）、提交準備；單站指令保留供精細控制 |
 | **v26.7.18** | 2026-07-28 | 依端到端實測修正：dispatcher 權限預設改 skip（acceptEdits 實測卡死）、dry-run 真唯讀、--status 增列實際執行值；新增審查修復迴圈（finding 分級 fix/design/requirement、主 session 修、限縮重審、2 輪上限）；任務模板加完成程序與 Windows 注意事項；/merge 薄包裝；grill 交接指紋 |
 | **v26.7.17** | 2026-07-27 | 修並行路線收尾：dispatch 從 main 出發自動開 `integrate/*` 整合分支（main 審查前保持乾淨）；/commit 增加並行模式——驗 pass 後把整合分支 merge --no-ff 回 main |
 | **v26.7.16** | 2026-07-27 | 調度改雙入口：新增 `/dispatch` slash command（Claude Code 內用，dry-run 確認、背景執行定期回報、衝突協助）與終端短別名 `bcd`；/dispatch 進 preset |
