@@ -61,9 +61,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # (plan on Fable -> execute on the session model writing .claude/worklog.md
 # -> review-code on Fable reads only that scope -> commit on sonnet).
 LEAN_SKILLS="ponytail ponytail-review worklog"
-LEAN_COMMANDS="go grill plan dispatch merge review-code commit learn save-session"
+LEAN_COMMANDS="go grill plan plans dispatch merge review-code commit learn save-session"
 STRICT_SKILLS="tdd-workflow verification-loop worklog"
-STRICT_COMMANDS="go grill plan spec dispatch merge tdd verify review-code commit learn save-session"
+STRICT_COMMANDS="go grill plan plans spec dispatch merge tdd verify review-code commit learn save-session"
 WRITING_SKILLS="speak-human-tw humanizer"
 
 list_items() {

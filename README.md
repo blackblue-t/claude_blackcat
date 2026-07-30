@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.27**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.28**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -380,6 +380,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.28** | 2026-07-29 | 新增 `/plans` 計畫整理：done 整包歸檔（計畫+requirements+spec 同 slug 一起搬）、爛尾計畫逐個問續作/棄置、絕不刪檔；/verify /commit 歸檔改整包制；任務檔歸檔到 tasks/archive/ |
 | **v26.7.27** | 2026-07-29 | 文件整理：設計說明改為只講設計理由，來源標註集中到「參考來源」一節（含 claw-code、Hallmark、Graphify、pencil）；WORKFLOW.md 開頭改為六條設計原則 |
 | **v26.7.26** | 2026-07-29 | 定前端檔案落點約定：`.pen` 設計稿放 `design/`（進 git、與碼同步），DESIGN.md/IA.md 留 `.claude/ui/`（流程契約），灰框原型即棄 |
 | **v26.7.25** | 2026-07-29 | 接上 pen CLI（@pencil.dev/cli，headless 畫布引擎）：--ui 偵測與安裝指引、/ui-page 新增 CLI 出圖迭代路線（無 GUI 也能畫布先行）、MCP 範本註記更新 |
