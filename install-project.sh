@@ -568,6 +568,38 @@ install_ui() {
         fi
         rm -rf "$_hmtmp"
     fi
+    # ui-ux-pro-max (github.com/nextlevelbuilder/ui-ux-pro-max-skill):
+    # searchable design DB (styles/palettes/font pairings/UX guidelines/
+    # a11y checks) queried via its own script -- low context cost. Role
+    # split: pro-max = knowledge base, hallmark = anti-slop personality,
+    # DESIGN.md = the project contract that always wins.
+    if [ -d "$DEST/skills/ui-ux-pro-max" ]; then
+        echo "  [keep] skills/ui-ux-pro-max (already installed)"
+    else
+        echo "  [ui-ux-pro-max] fetching design intelligence DB..."
+        _upmtmp="$DEST/.upm-tmp"
+        rm -rf "$_upmtmp"
+        if git clone --depth 1 https://github.com/nextlevelbuilder/ui-ux-pro-max-skill "$_upmtmp" >/dev/null 2>&1; then
+            _upmsrc=""
+            if [ -f "$_upmtmp/SKILL.md" ]; then
+                _upmsrc="$_upmtmp"
+            else
+                _upmfound="$(find "$_upmtmp" -name SKILL.md -not -path '*/.git/*' 2>/dev/null | head -1)"
+                [ -n "$_upmfound" ] && _upmsrc="$(dirname "$_upmfound")"
+            fi
+            if [ -n "$_upmsrc" ] && [ -f "$_upmsrc/SKILL.md" ]; then
+                mkdir -p "$DEST/skills"
+                cp -r "$_upmsrc" "$DEST/skills/ui-ux-pro-max"
+                rm -rf "$DEST/skills/ui-ux-pro-max/.git"
+                echo "  [copy] skills/ui-ux-pro-max (styles/palettes/UX guidelines DB)"
+            else
+                echo "  [skip] ui-ux-pro-max: unexpected repo layout"
+            fi
+        else
+            echo "  [skip] could not fetch ui-ux-pro-max (offline?)"
+        fi
+        rm -rf "$_upmtmp"
+    fi
     # pen CLI (@pencil.dev/cli): headless .pen engine -- agent, MCP tools,
     # PNG/JPEG/WEBP/PDF export -- no desktop app needed. Auth: pen login.
     if command -v pen >/dev/null 2>&1; then

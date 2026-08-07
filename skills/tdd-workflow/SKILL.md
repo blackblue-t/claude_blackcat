@@ -405,6 +405,22 @@ npm test && npm run lint
 - E2E tests cover critical user flows
 - Tests catch bugs before production
 
+## Test Quality Rules (anti-brittle, anti-bloat)
+
+Coverage is a floor, not a goal -- bad tests are worse than no tests.
+
+1. **Test behavior, not presentation.** NEVER assert on user-facing copy
+   (display text, labels, marketing strings): copy edits must not break
+   tests. Select elements by role / `data-testid` / aria attributes and
+   assert on behavior, state, and data.
+2. **One reason to fail.** Each test fails for exactly one behavioral
+   reason. No snapshot-everything tests.
+3. **No coverage padding.** Do not test implementation restatements
+   (getters, constants, framework glue). Test count scales with risk,
+   not with file count.
+4. **Copy/style changes are not TDD events.** Pure text or styling edits
+   need no new tests -- run the existing suite and move on.
+
 ---
 
 **Remember**: Tests are not optional. They are the safety net that enables confident refactoring, rapid development, and production reliability.

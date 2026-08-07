@@ -23,6 +23,11 @@ description: 前端第一站：問答定風格，產出 DESIGN.md（色票 token
    - 深色模式：要 / 不要 / 跟隨系統
    - 字體：系統字體堆疊（預設建議）/ 指定字型
    - 圓角與陰影的個性：銳利 / 柔和
+   - **Icon 集（擇一，防混用）**：lucide / heroicons / Material
+     Symbols / 專案自有 SVG——選定寫進 DESIGN.md，之後**所有產出只准
+     用這一套**，混用視為違規。
+   - **元件策略**：用哪套元件庫（或自建）；自建時 DESIGN.md 記錄共用
+     元件清單的位置，**新元件前先查清單複用**。
 3. **產出 `.claude/ui/DESIGN.md`**：
    - 色票 tokens（含深淺兩版，語意命名：`--color-primary` 而非 `--blue`）
    - 字體階層（h1-h4 / body / caption 的 size、weight、line-height）
@@ -44,4 +49,7 @@ description: 前端第一站：問答定風格，產出 DESIGN.md（色票 token
 
 - pencil MCP 可用時，用它取得/同步設計稿的 tokens，DESIGN.md 與設計稿
   一致；不可用就純問答。
+- 專案裝有 `ui-ux-pro-max` skill 時,用它的資料庫查色盤/字體配對/UX
+  準則**作為選項來源**;但 DESIGN.md 一旦定案就是唯一契約,之後的查詢
+  結果不得推翻契約。
 - 不寫任何元件程式碼——本站只定規範。
