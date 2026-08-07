@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.29**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.30**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -146,7 +146,9 @@ user check：git log 確認、push 由你決定 → /dispatch --clean 收 worktr
   └─ 收尾可跑 /learn：把本次教訓蒸餾進 CLAUDE.md（下個 session 不再踩）
 ```
 
-**前端專案**另有三部曲（初始化時選裝或 `blackcat --ui` 隨時加）：`/ui-style`（問答定風格 → DESIGN.md tokens，**品牌色優先**——給 hex 就生成整套色階、語意 tokens、深色版與 WCAG 對比檢查）→ `/ui-site`（IA 契約 + 路由 stubs）→ `/ui-page <路徑>`（單頁深化，委派 ui-builder agent，附風格合規自檢）。裝 UI pack 時會自動抓兩個 skill 進專案 `.claude/skills/`，分工明確：[Hallmark](https://github.com/nutlope/hallmark)（MIT）是**視覺個性層**——20 種主題 + 57 道 slop-test 檢查關，專殺紫漸層和模板臉，另有 `audit`／`study`；[ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 是 **UX 知識庫層**——可查詢的設計資料庫（50+ 風格、97 色盤、57 字體配對、99 條 UX 準則、a11y 檢查），用腳本查詢、context 成本低。優先序：**DESIGN.md 契約永遠最大**，pro-max 是選型時的查詢來源、hallmark 是產出時的反 slop 關卡，查詢結果不得推翻已定案的契約。**Pencil** 兩種裝法：桌面 app（[pencil.dev](https://pencil.dev)，開 `.pen` 檔自動接上 Claude Code，畫布上直接拖拉調整）或 **pen CLI**（`npm install -g @pencil.dev/cli`，Node 18+，`pen login` 認證）——CLI 是 headless 的同款引擎，能跑 agent、呼叫 MCP 工具、**匯出 PNG/JPEG/WEBP/PDF**，沒有 GUI 也能走「AI 畫 → 出圖給你看 → 文字回饋修改 → 迭代到確認」的畫布先行流程；`blackcat --ui` 會偵測 pen CLI 並給安裝指引。MCP 接線細節見 [pen CLI 文件](https://docs.pencil.dev/for-developers/pen-cli)。**動線驗證**（Figma prototype 的替代）：/ui-site 可產出灰框 HTML 原型——頁面連結真的可點、彈窗真的會開，瀏覽器直接走完整個流程。
+**前端專案**另有三部曲（初始化時選裝或 `blackcat --ui` 隨時加）：`/ui-style`（問答定風格 → DESIGN.md tokens，**品牌色優先**——給 hex 就生成整套色階、語意 tokens、深色版與 WCAG 對比檢查）→ `/ui-site`（IA 契約 + 路由 stubs）→ `/ui-page <路徑>`（單頁深化，委派 ui-builder agent，附風格合規自檢）。裝 UI pack 時會自動抓兩個 skill 進專案 `.claude/skills/`，分工明確：[Hallmark](https://github.com/nutlope/hallmark)（MIT）是**視覺個性層**——20 種主題 + 57 道 slop-test 檢查關，專殺紫漸層和模板臉，另有 `audit`／`study`；[ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 是 **UX 知識庫層**——可查詢的設計資料庫（50+ 風格、97 色盤、57 字體配對、99 條 UX 準則、a11y 檢查），用腳本查詢、context 成本低。優先序：**DESIGN.md 契約永遠最大**，pro-max 是選型時的查詢來源、hallmark 是產出時的反 slop 關卡，查詢結果不得推翻已定案的契約。這兩個外抓 skill 版本停在安裝當下，`blackcat --update` 刻意不碰它們（不是本 repo 的檔案）——要追新版跑 **`blackcat --ui-refresh`**（舊版先備份再重抓）。
+
+**小改動不裸奔**：/go 快車道遇到前端改動會自動過 `/grill-ui` 檢查卡——共用元件波及、元件狀態（hover/empty/loading…）、RWD 爆版、深色對應、tokens 合規、文案與測試、a11y 八項。機制與 /grill 同源：能從 codebase/DESIGN.md 自答的自己查證，真正的決策才問你（一次一題附建議答案，通常 ≤3 題）。也可手動單跑：`/grill-ui 把價格卡改三欄`。**Pencil** 兩種裝法：桌面 app（[pencil.dev](https://pencil.dev)，開 `.pen` 檔自動接上 Claude Code，畫布上直接拖拉調整）或 **pen CLI**（`npm install -g @pencil.dev/cli`，Node 18+，`pen login` 認證）——CLI 是 headless 的同款引擎，能跑 agent、呼叫 MCP 工具、**匯出 PNG/JPEG/WEBP/PDF**，沒有 GUI 也能走「AI 畫 → 出圖給你看 → 文字回饋修改 → 迭代到確認」的畫布先行流程；`blackcat --ui` 會偵測 pen CLI 並給安裝指引。MCP 接線細節見 [pen CLI 文件](https://docs.pencil.dev/for-developers/pen-cli)。**動線驗證**（Figma prototype 的替代）：/ui-site 可產出灰框 HTML 原型——頁面連結真的可點、彈窗真的會開，瀏覽器直接走完整個流程。
 
 **MCP 快速設定**：`templates/mcp.json.windows.example` / `mcp.json.linux-macos.example` 複製到專案根改名 `.mcp.json`、刪掉不用的、填 key 即可（機器特定，勿 commit）。
 
@@ -381,6 +383,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.30** | 2026-08-07 | 新增 /grill-ui（grill 的前端分支：八項檢查卡 + 同源訪談機制，/go 快車道自動走）；`--ui-refresh` 重抓外部 skills（hallmark/ui-ux-pro-max 追新版，舊版備份） |
 | **v26.7.29** | 2026-07-30 | 實戰修正四項：/go 快車道（trivial 小改跳過 grill/plan/跨 session 審查）；測試品質規則（禁 UI 文案斷言、禁湊覆蓋率，review 會抓）；元件/icon 統一（DESIGN.md 指定唯一 icon 集、複用優先）；UI pack 加裝 ui-ux-pro-max（UX 知識庫層，DESIGN.md 契約優先） |
 | **v26.7.28** | 2026-07-29 | 新增 `/plans` 計畫整理：done 整包歸檔（計畫+requirements+spec 同 slug 一起搬）、爛尾計畫逐個問續作/棄置、絕不刪檔；/verify /commit 歸檔改整包制；任務檔歸檔到 tasks/archive/ |
 | **v26.7.27** | 2026-07-29 | 文件整理：設計說明改為只講設計理由，來源標註集中到「參考來源」一節（含 claw-code、Hallmark、Graphify、pencil）；WORKFLOW.md 開頭改為六條設計原則 |

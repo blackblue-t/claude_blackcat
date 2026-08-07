@@ -61,9 +61,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # (plan on Fable -> execute on the session model writing .claude/worklog.md
 # -> review-code on Fable reads only that scope -> commit on sonnet).
 LEAN_SKILLS="ponytail ponytail-review worklog"
-LEAN_COMMANDS="go grill plan plans dispatch merge review-code commit learn save-session"
+LEAN_COMMANDS="go grill grill-ui plan plans dispatch merge review-code commit learn save-session"
 STRICT_SKILLS="tdd-workflow verification-loop worklog"
-STRICT_COMMANDS="go grill plan plans spec dispatch merge tdd verify review-code commit learn save-session"
+STRICT_COMMANDS="go grill grill-ui plan plans spec dispatch merge tdd verify review-code commit learn save-session"
 WRITING_SKILLS="speak-human-tw humanizer"
 
 list_items() {
@@ -112,6 +112,7 @@ MODEL_PICK=false
 FORCE_MODELS=false
 GRAPHIFY=false
 UI=false
+UI_REFRESH=false
 PRESET="lean"
 
 UI_COMMANDS="ui-style ui-site ui-page"
@@ -134,6 +135,7 @@ while [ $# -gt 0 ]; do
         --models) FORCE_MODELS=true ;;
         --graphify) GRAPHIFY=true ;;
         --ui) UI=true ;;
+        --ui-refresh) UI_REFRESH=true ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
         --commands) COMMANDS="${2//,/ }"; shift ;;
         --agents) AGENTS="${2//,/ }"; shift ;;
@@ -612,6 +614,22 @@ install_ui() {
         echo "         (the pencil desktop app wires its MCP automatically instead)"
     fi
 }
+
+# --ui-refresh: externally fetched skills (hallmark, ui-ux-pro-max) are
+# pinned at whatever was latest when installed and are ignored by the
+# normal update flow (they are not this repo's files). This re-fetches
+# them, backing up the old copies first.
+if [ "$UI_REFRESH" = true ] && [ "$UPDATE_ONLY" != true ]; then
+    _bku="$DEST/backups/ui-refresh-$(date +%Y%m%d-%H%M%S)"
+    for s in hallmark ui-ux-pro-max; do
+        if [ -d "$DEST/skills/$s" ]; then
+            mkdir -p "$_bku"
+            mv "$DEST/skills/$s" "$_bku/$s"
+            echo "[ui-refresh] backed up skills/$s -> $_bku"
+        fi
+    done
+    UI=true
+fi
 
 if [ "$UPDATE_ONLY" != true ]; then
     if [ "$UI" = true ]; then
