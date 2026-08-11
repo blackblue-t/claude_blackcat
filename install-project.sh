@@ -169,26 +169,40 @@ if [ "$USAGE_MODE" = true ]; then
         exit 0
     fi
     echo "[usage] scanning $N_FILES session transcript(s) in $(basename "$TDIR")"
-    echo ""
-    echo "-- skills (times invoked) --"
+    # Built-ins are Claude Code's own, not installed by this repo -- counting
+    # them together with project items makes the report misleading.
+    BUILTIN_CMDS="(clear|compact|resume-session|resume|mcp|model|config|help|cost|status|login|logout|agents|context|export|memory|doctor|fast|loop|vim|terminal-setup|add-dir|permissions|hooks|output-style|statusline|todos|bug|release-notes|upgrade|privacy-settings|exit|quit)"
+    BUILTIN_AGENTS="(general-purpose|Explore|Plan|claude|statusline-setup|claude-code-guide|output-style-setup)"
+    BUILTIN_SKILLS="(artifact-design|artifact-capabilities|artifact-diagramming|dataviz|skill-creator|pdf|docx|xlsx|pptx|grilling|update-config|simplify|run|morning|init)"
+
+    TMPU="$TDIR/.bc-usage.tmp"
     grep -ho '"skill"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
-        | sed 's/.*"skill"[[:space:]]*:[[:space:]]*"//;s/"$//' \
-        | sort | uniq -c | sort -rn || true
-    grep -ho '"skill"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
-        | grep -q . || echo "  (none recorded)"
-    echo ""
-    echo "-- commands (times run) --"
+        | sed 's/.*"skill"[[:space:]]*:[[:space:]]*"//;s/"$//' | sort | uniq -c | sort -rn > "$TMPU.sk" || true
     grep -ho '<command-name>[^<]*</command-name>' "$TDIR"/*.jsonl 2>/dev/null \
-        | sed 's|<command-name>/\{0,1\}||;s|</command-name>||' \
-        | sort | uniq -c | sort -rn || true
-    grep -ho '<command-name>' "$TDIR"/*.jsonl 2>/dev/null | grep -q . \
-        || echo "  (none recorded)"
-    echo ""
-    echo "-- agents (times dispatched) --"
+        | sed 's|<command-name>/\{0,1\}||;s|</command-name>||' | sort | uniq -c | sort -rn > "$TMPU.cm" || true
     grep -ho '"subagent_type"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
-        | sed 's/.*: *"//;s/"$//' | sort | uniq -c | sort -rn || true
-    grep -ho '"subagent_type"' "$TDIR"/*.jsonl 2>/dev/null | grep -q . \
-        || echo "  (none recorded)"
+        | sed 's/.*: *"//;s/"$//' | sort | uniq -c | sort -rn > "$TMPU.ag" || true
+
+    echo ""
+    echo "-- YOUR commands (times run) --"
+    grep -vE "^ *[0-9]+ $BUILTIN_CMDS\$" "$TMPU.cm" 2>/dev/null \
+        | awk 'NF' | grep . || echo "  (none recorded)"
+    echo ""
+    echo "-- YOUR skills (times the Skill tool fired) --"
+    echo "   note: slash commands also dispatch through the Skill tool, so names"
+    echo "   matching your commands are command runs, not skill auto-triggers."
+    grep -vE "^ *[0-9]+ $BUILTIN_SKILLS\$" "$TMPU.sk" 2>/dev/null \
+        | awk 'NF' | grep . || echo "  (none recorded)"
+    echo ""
+    echo "-- YOUR agents (times dispatched) --"
+    grep -vE "^ *[0-9]+ $BUILTIN_AGENTS\$" "$TMPU.ag" 2>/dev/null \
+        | awk 'NF' | grep . || echo "  (none -- built-in agents only)"
+    echo ""
+    echo "-- built-in Claude Code usage (not installed by blackcat) --"
+    printf "  commands: "; grep -E "^ *[0-9]+ $BUILTIN_CMDS\$" "$TMPU.cm" 2>/dev/null | awk '{printf "%s(%s) ", $2, $1}'; echo ""
+    printf "  agents:   "; grep -E "^ *[0-9]+ $BUILTIN_AGENTS\$" "$TMPU.ag" 2>/dev/null | awk '{printf "%s(%s) ", $2, $1}'; echo ""
+    printf "  skills:   "; grep -E "^ *[0-9]+ $BUILTIN_SKILLS\$" "$TMPU.sk" 2>/dev/null | awk '{printf "%s(%s) ", $2, $1}'; echo ""
+    rm -f "$TMPU".sk "$TMPU".cm "$TMPU".ag
     echo ""
     echo "-- installed but never seen in these transcripts --"
     UNUSED=0
@@ -205,6 +219,18 @@ if [ "$USAGE_MODE" = true ]; then
             || { echo "  command: /$n"; UNUSED=$((UNUSED+1)); }
     done
     [ "$UNUSED" -eq 0 ] && echo "  (everything installed has been used at least once)"
+    # A skill listed as unused whose matching command DID run means the skill
+    # never auto-triggered -- the command carried the work. That is a wiring
+    # problem (skill auto-trigger is best-effort), not necessarily dead weight.
+    echo ""
+    echo "[how to read this]"
+    echo "  - An unused SKILL whose matching command ran a lot = the skill never"
+    echo "    auto-triggered. Either drop it, or force it via a line in CLAUDE.md."
+    echo "  - Lean skills (ponytail*) sitting in a strict project (or vice versa)"
+    echo "    are preset leftovers -- run blackcat --strict / --lean to switch"
+    echo "    cleanly (conflicting skills get moved to .claude/backups/)."
+    echo "  - Low-frequency is not the same as useless: some items are monthly"
+    echo "    (e.g. /plans) or situational (e.g. writing pack)."
     echo ""
     echo "[caveats] Counts cover sessions recorded on THIS machine for THIS"
     echo "          project path only. Transcripts are pruned by Claude Code's"
