@@ -113,6 +113,7 @@ FORCE_MODELS=false
 GRAPHIFY=false
 UI=false
 UI_REFRESH=false
+USAGE_MODE=false
 PRESET="lean"
 
 UI_COMMANDS="ui-style ui-site ui-page"
@@ -136,6 +137,7 @@ while [ $# -gt 0 ]; do
         --graphify) GRAPHIFY=true ;;
         --ui) UI=true ;;
         --ui-refresh) UI_REFRESH=true ;;
+        --usage|--skill-freq) USAGE_MODE=true ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
         --commands) COMMANDS="${2//,/ }"; shift ;;
         --agents) AGENTS="${2//,/ }"; shift ;;
@@ -144,6 +146,72 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
+
+# ---------------------------------------------------------------- usage ----
+# blackcat --usage (alias --skill-freq): count how often each skill /
+# command / agent was actually used in this project, by scanning Claude
+# Code's own session transcripts (~/.claude/projects/<encoded-path>/*.jsonl).
+# Zero runtime cost -- no hooks, purely retroactive analysis.
+if [ "$USAGE_MODE" = true ]; then
+    PROJ_STORE="$HOME/.claude/projects"
+    ENC="$(printf '%s' "$TARGET" | sed 's|[^A-Za-z0-9]|-|g')"
+    TDIR="$PROJ_STORE/$ENC"
+    if [ ! -d "$TDIR" ]; then
+        # fallback: suffix match on the encoded basename
+        BASE_ENC="$(basename "$TARGET" | sed 's|[^A-Za-z0-9]|-|g')"
+        CAND="$(ls "$PROJ_STORE" 2>/dev/null | grep -- "-$BASE_ENC$" | head -1)"
+        [ -n "$CAND" ] && TDIR="$PROJ_STORE/$CAND"
+    fi
+    N_FILES="$(ls "$TDIR"/*.jsonl 2>/dev/null | wc -l)"
+    if [ ! -d "$TDIR" ] || [ "$N_FILES" -eq 0 ]; then
+        echo "[usage] no session transcripts found for this project"
+        echo "        (looked in $PROJ_STORE/$ENC)"
+        exit 0
+    fi
+    echo "[usage] scanning $N_FILES session transcript(s) in $(basename "$TDIR")"
+    echo ""
+    echo "-- skills (times invoked) --"
+    grep -ho '"skill"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
+        | sed 's/.*"skill"[[:space:]]*:[[:space:]]*"//;s/"$//' \
+        | sort | uniq -c | sort -rn || true
+    grep -ho '"skill"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
+        | grep -q . || echo "  (none recorded)"
+    echo ""
+    echo "-- commands (times run) --"
+    grep -ho '<command-name>[^<]*</command-name>' "$TDIR"/*.jsonl 2>/dev/null \
+        | sed 's|<command-name>/\{0,1\}||;s|</command-name>||' \
+        | sort | uniq -c | sort -rn || true
+    grep -ho '<command-name>' "$TDIR"/*.jsonl 2>/dev/null | grep -q . \
+        || echo "  (none recorded)"
+    echo ""
+    echo "-- agents (times dispatched) --"
+    grep -ho '"subagent_type"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
+        | sed 's/.*: *"//;s/"$//' | sort | uniq -c | sort -rn || true
+    grep -ho '"subagent_type"' "$TDIR"/*.jsonl 2>/dev/null | grep -q . \
+        || echo "  (none recorded)"
+    echo ""
+    echo "-- installed but never seen in these transcripts --"
+    UNUSED=0
+    for d in "$DEST"/skills/*/; do
+        [ -d "$d" ] || continue
+        n="$(basename "$d")"
+        grep -q "\"skill\"[[:space:]]*:[[:space:]]*\"$n\"" "$TDIR"/*.jsonl 2>/dev/null \
+            || { echo "  skill:   $n"; UNUSED=$((UNUSED+1)); }
+    done
+    for f in "$DEST"/commands/*.md; do
+        [ -f "$f" ] || continue
+        n="$(basename "$f" .md)"
+        grep -q "<command-name>/\{0,1\}$n<" "$TDIR"/*.jsonl 2>/dev/null \
+            || { echo "  command: /$n"; UNUSED=$((UNUSED+1)); }
+    done
+    [ "$UNUSED" -eq 0 ] && echo "  (everything installed has been used at least once)"
+    echo ""
+    echo "[caveats] Counts cover sessions recorded on THIS machine for THIS"
+    echo "          project path only. Transcripts are pruned by Claude Code's"
+    echo "          retention setting, and worktree/headless sessions log under"
+    echo "          their own paths -- treat numbers as a floor, not exact."
+    exit 0
+fi
 
 if [ "$ALL" = true ]; then
     SKILLS=$(ls "$SCRIPT_DIR/skills")

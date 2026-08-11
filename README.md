@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.30**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.31**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -50,6 +50,7 @@ blackcat --rules python  :: 直接指定編碼規範（common 全部 + 指定語
 blackcat --no-rules   :: 跳過規範選單（CI / 腳本用；非互動環境本來就會自動跳過）
 blackcat --taskmaster :: 加裝 TaskMaster
 blackcat --update     :: 純更新模式：blackcat repo 更新後，刷新專案裡已裝且有變動的項目
+blackcat --usage      :: 用量統計：這個專案的 skills/commands/agents 各用過幾次、哪些裝了沒用過（別名 --skill-freq）
 blackcat --graphify   :: 加裝 Graphify 知識圖譜（省 token；需先裝 graphify CLI）
 bcd                   :: 並行任務調度（blackcat-dispatch 的短別名；Claude Code 裡用 /dispatch）
 blackcat --list       :: 看全部選項
@@ -383,6 +384,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.31** | 2026-08-07 | 新增 `blackcat --usage`（--skill-freq）：掃 Claude Code session transcripts 統計 skills/commands/agents 使用次數、列出裝了沒用過的——零常駐成本的回溯分析，供裁汰決策 |
 | **v26.7.30** | 2026-08-07 | 新增 /grill-ui（grill 的前端分支：八項檢查卡 + 同源訪談機制，/go 快車道自動走）；`--ui-refresh` 重抓外部 skills（hallmark/ui-ux-pro-max 追新版，舊版備份） |
 | **v26.7.29** | 2026-07-30 | 實戰修正四項：/go 快車道（trivial 小改跳過 grill/plan/跨 session 審查）；測試品質規則（禁 UI 文案斷言、禁湊覆蓋率，review 會抓）；元件/icon 統一（DESIGN.md 指定唯一 icon 集、複用優先）；UI pack 加裝 ui-ux-pro-max（UX 知識庫層，DESIGN.md 契約優先） |
 | **v26.7.28** | 2026-07-29 | 新增 `/plans` 計畫整理：done 整包歸檔（計畫+requirements+spec 同 slug 一起搬）、爛尾計畫逐個問續作/棄置、絕不刪檔；/verify /commit 歸檔改整包制；任務檔歸檔到 tasks/archive/ |
