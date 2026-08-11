@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.17**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.31**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -50,6 +50,7 @@ blackcat --rules python  :: 直接指定編碼規範（common 全部 + 指定語
 blackcat --no-rules   :: 跳過規範選單（CI / 腳本用；非互動環境本來就會自動跳過）
 blackcat --taskmaster :: 加裝 TaskMaster
 blackcat --update     :: 純更新模式：blackcat repo 更新後，刷新專案裡已裝且有變動的項目
+blackcat --usage      :: 用量統計：這個專案的 skills/commands/agents 各用過幾次、哪些裝了沒用過（別名 --skill-freq）
 blackcat --graphify   :: 加裝 Graphify 知識圖譜（省 token；需先裝 graphify CLI）
 bcd                   :: 並行任務調度（blackcat-dispatch 的短別名；Claude Code 裡用 /dispatch）
 blackcat --list       :: 看全部選項
@@ -67,6 +68,8 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 | `--writing`（疊加） | 會產出對外文字的專案 | speak-human-tw、humanizer | — |
 
 > lean 和 strict **刻意互斥**：ponytail 的「測試留最小 check」和 tdd-workflow 的「強制 80% 覆蓋率」觸發條件相同、指令互相矛盾，同裝會讓行為不可預測。要混用請自行 `--skills` 指定。`--writing` 則跟兩者都不衝突（不同場域）。
+>
+> **切換 preset**：直接在專案裡跑另一個 preset 即可——安裝器會偵測衝突並詢問「Switch to strict? [y/N]」，`y` 就把舊 preset 的 skills 移到 `.claude/backups/preset-switch-<時間戳>/` 再裝新的（留下的舊指令檔如 /tdd 無害，只有被呼叫才作用）。非互動環境只警告不動手。
 
 裝完把專案的 `.claude/` 提交進該專案的 git。
 
@@ -88,21 +91,67 @@ repo 端的預設值集中在這幾個位置，要整批調整（例如未來降
 執行 → 審查 → 提交靠 **worklog 接力**：執行時 worklog skill 把每個變更（動了哪些檔、做了什麼、驗證結果）追加到專案的 `.claude/worklog.md`；`/review-code` **只讀 worklog + 列出檔案的 git diff**（不掃全專案，Fable 的錢花在刀口上），結論寫回 worklog；`verdict: pass` 後 `/commit` 用 Sonnet 只 stage 紀錄過的檔案、寫 commit message、提交並歸檔 worklog。worklog skill 與 `/commit` 已加入 lean/strict 兩個 preset。
 
 > Fable 5 是 Opus 之上的模型級別、單價較高，所以只配給規劃與審查；用之前先在 CLI 打 `/model` 確認你的方案看得到 `claude-fable-5`，看不到就把兩個 frontmatter 降回 `opus`。
+>
+> **驗證路由是否生效**：別問模型「你是誰」——session 系統提示詞不隨斜線指令的 `model:` 更新，自報不可靠（實測結論）。要驗就用外部觀測：`/status`、API 用量紀錄，或 dispatcher stdout 的模型回顯（任務層 `model:` 已實測確證生效）。
 
-### 完整開發流程（含並行執行）
+### 一條龍：`/go`（日常建議入口）
+
+不想站站手打指令，就用 `/go <你的需求>`——它把整條流程串起來，**唯一必停的人工關卡是計畫確認**（業界共識的關卡位置：計畫錯全錯，其他站都可自動）：
 
 ```
-user 提需求
-  → /grill（Fable）拷問需求到沒有模糊地帶 → requirements 文件
-  → /plan（Fable）架構 + 任務拆解；獨立且檔案不重疊的任務匯出到 .claude/tasks/
-  → /dispatch（Opus ×N）每個任務一個獨立 worktree + 分支 + headless session
-      （從 main 出發會自動先開 integrate/* 整合分支——main 在審查通過前保持乾淨）
-  → /dispatch --merge 依序把任務分支合進整合分支
-  → 開新 session 跑 /review-code（Fable）——只讀 worklog.d/* + diff，天然跨 session
-  → /commit（Sonnet）：一般路線 = 提交 working tree 變更；
-      並行路線 = 驗 pass 後把整合分支 merge --no-ff 回 main
-  → user check（git log 確認、push 由你決定；並行路線最後 /dispatch --clean）
+/go 幫我加上匯出 CSV 功能
+  → （需求模糊才問 2-3 題關鍵問題）
+  → 計畫呈現 ⏸ 你確認 ← 唯一必停
+  → 自動執行（有並行任務走 dispatcher，一般任務直接做，strict 走 TDD）
+  → 自動開 headless session 跨 session 審查（不用你開視窗）
+  → needs-fix 自動修 + 限縮重審（上限 2 輪）；escalate 停下找你
+  → 提交準備完成 → 你看 git log、決定 push
 ```
+
+`/grill`、`/plan`、`/review-code` 等單站指令保留——要精細控制或補跑某站時用。
+
+**心智模型：「站」和「紀律」是兩種東西。** 站 = 流程走到哪（grill → plan → 執行 → review → commit）；紀律 = 做的時候怎麼做（tdd-workflow、worklog、ponytail、rules），跟著執行走、不是獨立的站。`/tdd` 屬於紀律——不是「拿去 dispatch」，而是 worktree 是專案完整副本、`.claude/` 的 skills 跟著 checkout 過去，**每個並行 session 自己帶著 TDD 紀律做事**（dispatcher 提示詞明確要求遵守專案 skills/rules）。用 /go 之後紀律自動套用，單站指令只在想插手時存在。
+
+### 完整開發流程（v26.7.22 定版）
+
+```
+user 提需求（日常直接 /go，以下是它串起來的全圖）
+  │
+  ▼
+/grill（Fable）第一題永遠是範疇分級 scope: demo / mvp / full
+  │   拷問深度隨 scope 縮放 → requirements 文件（含交接指紋 3-5 條）
+  ▼
+/spec（Fable，依 scope）demo 跳過｜mvp 可選 PRD-lite｜full 建議 PRD+BDD
+  │   規格先於任務拆解，防範疇蔓延
+  ▼
+/plan（Fable）架構 + 拆階段；回報指紋命中數
+  │   獨立且檔案不重疊的任務 → 匯出 .claude/tasks/（含「完成程序」固定段落）
+  │   ⏸ 計畫確認 = /go 全程唯一必停的人工關卡
+  ▼
+執行（Opus）──兩種形態，/go 自動選：
+  │   序列：主 session 直接做（strict 走 TDD 紀律；worklog 記錄每步）
+  │   並行：/dispatch 每任務一個 worktree + 分支 + 獨立 session
+  │         從 main 出發自動開 integrate/* 整合分支（main 審查前不動）
+  │         --windows 開實體終端視窗（標題 bc-<任務>，不搞混、可即時盯）
+  │         → /dispatch --merge 合進整合分支（衝突停下協助解）
+  ▼
+/review-code（Fable，獨立 session——/go 用 headless 自動開）
+  │   只讀 worklog(.d) + 列出檔案的 diff，不掃全庫
+  │   finding 分級：[fix] 主 session 修（修/審分離）→ 限縮重審，上限 2 輪
+  │              [design] 回 /plan｜[requirement] 回 /grill（escalate 必停）
+  ▼
+/commit（Sonnet）驗 pass 才動：審查修復先在整合分支 commit
+  │   → merge --no-ff 回 main → 歸檔 worklog 與完成的計畫/spec（strict 由 /verify 做）
+  ▼
+user check：git log 確認、push 由你決定 → /dispatch --clean 收 worktree
+  └─ 收尾可跑 /learn：把本次教訓蒸餾進 CLAUDE.md（下個 session 不再踩）
+```
+
+**前端專案**另有三部曲（初始化時選裝或 `blackcat --ui` 隨時加）：`/ui-style`（問答定風格 → DESIGN.md tokens，**品牌色優先**——給 hex 就生成整套色階、語意 tokens、深色版與 WCAG 對比檢查）→ `/ui-site`（IA 契約 + 路由 stubs）→ `/ui-page <路徑>`（單頁深化，委派 ui-builder agent，附風格合規自檢）。裝 UI pack 時會自動抓兩個 skill 進專案 `.claude/skills/`，分工明確：[Hallmark](https://github.com/nutlope/hallmark)（MIT）是**視覺個性層**——20 種主題 + 57 道 slop-test 檢查關，專殺紫漸層和模板臉，另有 `audit`／`study`；[ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 是 **UX 知識庫層**——可查詢的設計資料庫（50+ 風格、97 色盤、57 字體配對、99 條 UX 準則、a11y 檢查），用腳本查詢、context 成本低。優先序：**DESIGN.md 契約永遠最大**，pro-max 是選型時的查詢來源、hallmark 是產出時的反 slop 關卡，查詢結果不得推翻已定案的契約。這兩個外抓 skill 版本停在安裝當下，`blackcat --update` 刻意不碰它們（不是本 repo 的檔案）——要追新版跑 **`blackcat --ui-refresh`**（舊版先備份再重抓）。
+
+**小改動不裸奔**：/go 快車道遇到前端改動會自動過 `/grill-ui` 檢查卡——共用元件波及、元件狀態（hover/empty/loading…）、RWD 爆版、深色對應、tokens 合規、文案與測試、a11y 八項。機制與 /grill 同源：能從 codebase/DESIGN.md 自答的自己查證，真正的決策才問你（一次一題附建議答案，通常 ≤3 題）。也可手動單跑：`/grill-ui 把價格卡改三欄`。**Pencil** 兩種裝法：桌面 app（[pencil.dev](https://pencil.dev)，開 `.pen` 檔自動接上 Claude Code，畫布上直接拖拉調整）或 **pen CLI**（`npm install -g @pencil.dev/cli`，Node 18+，`pen login` 認證）——CLI 是 headless 的同款引擎，能跑 agent、呼叫 MCP 工具、**匯出 PNG/JPEG/WEBP/PDF**，沒有 GUI 也能走「AI 畫 → 出圖給你看 → 文字回饋修改 → 迭代到確認」的畫布先行流程；`blackcat --ui` 會偵測 pen CLI 並給安裝指引。MCP 接線細節見 [pen CLI 文件](https://docs.pencil.dev/for-developers/pen-cli)。**動線驗證**（Figma prototype 的替代）：/ui-site 可產出灰框 HTML 原型——頁面連結真的可點、彈窗真的會開，瀏覽器直接走完整個流程。
+
+**MCP 快速設定**：`templates/mcp.json.windows.example` / `mcp.json.linux-macos.example` 複製到專案根改名 `.mcp.json`、刪掉不用的、填 key 即可（機器特定，勿 commit）。
 
 **為什麼是 worktree 而不是 sub-agent**：sub-agent 的產出全部回堆到主 session 的 context，任務一多就炸，而且每個 sub-agent 要重新讀一遍專案背景。worktree + headless session 是**完全獨立的 context**——互不污染、各自省流，程式碼隔離在各自分支，最後才合併。
 
@@ -120,7 +169,12 @@ bcd --merge         # 合併完成的任務分支（衝突會停下指路）
 bcd --clean         # 移除 worktree、刪已合併分支
 ```
 
-**併發上限**三個層級：`--max N` 單次生效 → 加 `--save` 寫入專案 `.claude/dispatch.conf`（`MAX_PARALLEL=N`，之後預設沿用）→ 都沒設預設 2。conf 還可設 `DISPATCH_MODEL`（任務預設模型，個別任務檔可用 `model:` 覆蓋）與 `DISPATCH_PERMISSIONS`（`acceptEdits` 預設：自動核准檔案編輯，但 git commit 等 Bash 指令要靠專案 permissions 允許；`skip` = `--dangerously-skip-permissions`，worktree 內全自動，只在信任的專案用）。
+**併發上限**三個層級：`--max N` 單次生效 → 加 `--save` 寫入專案 `.claude/dispatch.conf`（`MAX_PARALLEL=N`，之後預設沿用）→ 都沒設預設 2。實際執行參數記錄在 `--status` 的 `last run actual values`（設定值與執行值分開顯示）。conf 還可設 `DISPATCH_MODEL`（任務預設模型，個別任務檔 `model:` 可覆蓋）與 `DISPATCH_PERMISSIONS`：
+
+- **`skip`（預設）**= `--dangerously-skip-permissions`，worktree 內全自動。端到端實測的結論：`acceptEdits` 會擋掉驗證指令、`git commit` 和 `.claude/` 寫入，誠實的 agent 全數卡死在 pending、dispatcher 永不返回。真正的安全閘門在流程裡——任務檔案範圍鐵則、review gate、永不 push——不在權限模式。
+- `acceptEdits`：只給不信任的場景,並預期任務會卡住,除非專案 permissions 放行驗證指令。
+
+**審查修復迴圈**（needs-fix 之後）：審查者（Fable）給每個 finding 標級——`fix`（不動介面/資料格式/依賴/需求 → **主 session 修**,修的人與審的人分離）、`design`（回 /plan）、`requirement`（回 /grill）；有高層級 finding 整輪不修小的。修完做**限縮重審**（只看 finding + Fix 條目 + 修復 diff）,上限 2 輪,過不了就升級給使用者裁決。修復由 `/commit` 在整合分支上先行提交再合併回 main。
 
 **安全設計**：任務由 /plan 匯出時強制檔案不重疊、內容自足（headless session 沒有對話上下文）；每個 session 只寫自己的 `.claude/worklog.d/<slug>.md`（合併不衝突）；只 commit 不 push 不 merge；失敗的任務留 log 在 `.claude/dispatch-logs/`。
 
@@ -271,7 +325,7 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 ## 全域層細節
 
-**Statusline**：GUNDAM 版多行彩色（模型 │ context │ 目錄+branch │ 時長 │ 花費 + rate limit 進度條）。需要 `jq`，install.sh 會檢查。
+**Statusline**：多行彩色（模型 │ context │ 目錄+branch │ 時長 │ 花費 + rate limit 進度條）——把「現在燒多快」常駐在眼前，才會記得省。需要 `jq`，install.sh 會檢查。
 
 **Hooks**：v26.7.3 起全域**零 hooks**。agent-monitor 移至 project-template（`--taskmaster` 時隨專案安裝）；舊版 25+ 個 ECC hooks 已於 v26.7.1 移除。回滾看 git history。
 
@@ -308,17 +362,21 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 ---
 
-## 設定來源
+## 參考來源
 
-| 來源 | 取了什麼 |
-|:--|:--|
-| [mattpocock/skills](https://github.com/mattpocock/skills) | 「工作流進專案、複製可客製」架構理念 |
-| [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)（MIT） | ponytail、ponytail-review |
-| [Raymondhou0917/speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw)（MIT） | speak-human-tw（繁中去 AI 味） |
-| [blader/humanizer](https://github.com/blader/humanizer)（MIT） | humanizer（英文去 AI 味） |
-| [bheadwei/claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw) | 計畫持久化、session 記錄機制 |
-| [GUNDAM](https://github.com/kuanweic/claude-GUNDAM-zh-tw) | TaskMaster、commands、output-styles、statusline |
-| [ECC](https://github.com/affaan-m/everything-claude-code) | agents、部分 skills（已複製進本 repo，不需安裝 plugin） |
+設計過程中參考過的專案（含直接收錄的 MIT 授權內容）：
+
+- [mattpocock/skills](https://github.com/mattpocock/skills)
+- [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)（MIT，已收錄）
+- [bheadwei/claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw)
+- [ultraworkers/claw-code](https://github.com/ultraworkers/claw-code)
+- [nutlope/hallmark](https://github.com/nutlope/hallmark)（MIT，`--ui` 時抓進專案）
+- [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)（`--ui` 時抓進專案）
+- [Raymondhou0917/speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw)（MIT，已收錄）
+- [blader/humanizer](https://github.com/blader/humanizer)（MIT，已收錄）
+- [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code)
+- [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify)（選配整合）
+- [pencil.dev](https://pencil.dev)（選配整合）
 
 ---
 
@@ -326,6 +384,20 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.31** | 2026-08-07 | 新增 `blackcat --usage`（--skill-freq）：掃 Claude Code session transcripts 統計 skills/commands/agents 使用次數、列出裝了沒用過的——零常駐成本的回溯分析，供裁汰決策 |
+| **v26.7.30** | 2026-08-07 | 新增 /grill-ui（grill 的前端分支：八項檢查卡 + 同源訪談機制，/go 快車道自動走）；`--ui-refresh` 重抓外部 skills（hallmark/ui-ux-pro-max 追新版，舊版備份） |
+| **v26.7.29** | 2026-07-30 | 實戰修正四項：/go 快車道（trivial 小改跳過 grill/plan/跨 session 審查）；測試品質規則（禁 UI 文案斷言、禁湊覆蓋率，review 會抓）；元件/icon 統一（DESIGN.md 指定唯一 icon 集、複用優先）；UI pack 加裝 ui-ux-pro-max（UX 知識庫層，DESIGN.md 契約優先） |
+| **v26.7.28** | 2026-07-29 | 新增 `/plans` 計畫整理：done 整包歸檔（計畫+requirements+spec 同 slug 一起搬）、爛尾計畫逐個問續作/棄置、絕不刪檔；/verify /commit 歸檔改整包制；任務檔歸檔到 tasks/archive/ |
+| **v26.7.27** | 2026-07-29 | 文件整理：設計說明改為只講設計理由，來源標註集中到「參考來源」一節（含 claw-code、Hallmark、Graphify、pencil）；WORKFLOW.md 開頭改為六條設計原則 |
+| **v26.7.26** | 2026-07-29 | 定前端檔案落點約定：`.pen` 設計稿放 `design/`（進 git、與碼同步），DESIGN.md/IA.md 留 `.claude/ui/`（流程契約），灰框原型即棄 |
+| **v26.7.25** | 2026-07-29 | 接上 pen CLI（@pencil.dev/cli，headless 畫布引擎）：--ui 偵測與安裝指引、/ui-page 新增 CLI 出圖迭代路線（無 GUI 也能畫布先行）、MCP 範本註記更新 |
+| **v26.7.24** | 2026-07-29 | UI 補動線層：/ui-site 可產灰框 HTML 可點擊原型（Figma prototype 替代，連結真可點、彈窗真會開）；pencil 畫布先行流程寫進 ui-site/ui-page（AI 畫、人調、碼隨稿走） |
+| **v26.7.23** | 2026-07-29 | UI pack 整合 Hallmark（去 AI 味設計 skill，裝 --ui 時自動 clone 進專案）；/ui-style 改品牌色優先（hex → 色階/語意 tokens/深色版/WCAG 檢查）；ui-page 與 ui-builder 接 slop-test 檢查關 |
+| **v26.7.22** | 2026-07-29 | 吸收 GUNDAM 精華五項：/grill 範疇分級（demo/mvp/full）、/spec 文件先行（PRD/BDD）、/learn 持續學習、/verify 與 /commit 計畫歸檔、.mcp.json 分平台範本；dispatcher `--windows` 實體視窗模式（標題 bc-<任務>）；UI 前端三部曲選裝（--ui + 首裝詢問，pencil MCP 配套）；README 工作流全圖定版 |
+| **v26.7.21** | 2026-07-29 | preset 切換偵測：在專案上跑另一個 preset 會偵測互斥 skills、詢問後移到 backups 再裝新的（修 lean/strict 並存的矛盾風險） |
+| **v26.7.20** | 2026-07-28 | dispatcher 任務提示詞明確要求遵守專案 skills/rules（strict 專案的並行 session 明確走 TDD）；README 補「站 vs 紀律」心智模型 |
+| **v26.7.19** | 2026-07-28 | 新增 `/go` 一條龍：計畫確認為唯一人工關卡，之後自動執行、headless 跨 session 審查、修復迴圈（≤2 輪）、提交準備；單站指令保留供精細控制 |
+| **v26.7.18** | 2026-07-28 | 依端到端實測修正：dispatcher 權限預設改 skip（acceptEdits 實測卡死）、dry-run 真唯讀、--status 增列實際執行值；新增審查修復迴圈（finding 分級 fix/design/requirement、主 session 修、限縮重審、2 輪上限）；任務模板加完成程序與 Windows 注意事項；/merge 薄包裝；grill 交接指紋 |
 | **v26.7.17** | 2026-07-27 | 修並行路線收尾：dispatch 從 main 出發自動開 `integrate/*` 整合分支（main 審查前保持乾淨）；/commit 增加並行模式——驗 pass 後把整合分支 merge --no-ff 回 main |
 | **v26.7.16** | 2026-07-27 | 調度改雙入口：新增 `/dispatch` slash command（Claude Code 內用，dry-run 確認、背景執行定期回報、衝突協助）與終端短別名 `bcd`；/dispatch 進 preset |
 | **v26.7.15** | 2026-07-27 | 完整流程落地：新增 /grill（Fable 需求拷問）、/plan 並行任務匯出、`blackcat-dispatch`（worktree 隔離 + headless 並行執行，`--max` 控併發、merge/clean/status 子模式）；worklog.d 並行紀錄機制 |

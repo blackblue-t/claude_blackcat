@@ -58,7 +58,8 @@ updated: <日期>
 - 階段數依任務調整，小任務一兩個 phase 就好，不硬湊四個
 - 已存在 `status: active` 的計畫時，先提示是否接續，不要疊新計畫
 - 確認前**不寫任何檔案**（包含計畫檔本身）
-- `.claude/plans/` 裡有 `*-requirements.md`（/grill 的產出）時先讀它，需求以它為準
+- `.claude/plans/` 裡有 `*-requirements.md`（/grill 的產出）時先讀它，需求以它為準；
+  文件裡有「交接指紋」節時，規劃完成後**回報命中幾項**（驗證交接沒漏）
 
 ## 並行任務匯出（供 blackcat-dispatch 使用）
 
@@ -75,8 +76,24 @@ status: pending
 # 任務：<一句話>
 ## 目標與驗收條件
 ## 實作提示（必要的背景，讓無上下文的 session 能獨立完成）
-## 驗證指令（可執行）
+## 驗證指令（可執行；Windows 注意事項見下）
+## 完成程序（固定段落，逐字放進每個任務檔）
+1. 跑上面的驗證指令，通過才繼續。
+2. 把工作記錄寫到 `.claude/worklog.d/<slug>.md`（files / did / why / verify）。
+3. 把本檔 `status: pending` 改為 `status: done`。
+4. git add 動過的檔案並 commit（不 push、不 merge、不切分支）。
 ```
+
+「完成程序」是任務**內容**的一部分——不依賴 worklog skill 的自覺觸發,
+接力棒斷不得。
+
+**驗證指令的 Windows 注意事項**（實測踩過,寫任務檔時要避開）:
+- PowerShell 5.1 的 `Set-Content -Encoding utf8` **會寫 BOM**——建測試資料改用
+  `[System.IO.File]::WriteAllText`,或讀檔端用 `utf-8-sig`。
+- PowerShell 呼叫原生執行檔會**丟棄空字串參數**——不要用 `cmd ""` 測空輸入,
+  改在程式層直接呼叫（如 `main(['add',''])`）。
+- 主控台 cp950 顯示中文會亂碼——比對輸出前設 `$env:PYTHONUTF8=1` 或明確以
+  UTF-8 讀檔再比。
 
 匯出鐵則：
 

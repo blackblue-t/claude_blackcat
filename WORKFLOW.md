@@ -1,17 +1,15 @@
 # blackcat 工作流
 
-四家思想 + 自己的取捨，融合成一條流程。
+## 設計原則（為什麼長這樣）
 
-## 思想來源與各取什麼
+- **工作流屬於專案，複製即擁有。** 裝進專案的檔案就是專案的——改了不影響別的專案，換機器 clone 下來就有；全域只放個人偏好（statusline、模型預設）。不用 plugin 發佈機制：一個人用，不需要訂閱與版本協商的複雜度。
+- **同一概念只留一層。** TDD 用 skill 就不再疊 agent + command + output-style——同一件事有多層指令時，模型的行為變得不可預測。
+- **最小可行是預設（lean）。** 能不寫就不寫、先復用再手寫；需要嚴格再升 strict，不反過來——預設值決定了 90% 的日常行為，預設就該是低摩擦的那個。
+- **記憶進檔案，不留在對話。** 計畫、session 記錄（含失敗清單）、worklog 全部落地 `.claude/`——對話是暫存、檔案是記憶；計畫不依賴任何任務管理系統也能單獨運作。
+- **零常駐 hooks。** 每次 tool call 都執行的 hook 是常駐稅——會拖慢每一步、且靜默失敗難察覺。需要的機制做成選配（`--taskmaster`），用得到才裝。
+- **去 AI 味分語言。** 中文（台灣用語）與英文各一套改寫紀律，依輸出語言自動分工；不收簡體語境的版本，與台灣用語方向矛盾。
 
-| 來源 | 取了什麼 | 沒取什麼（理由） |
-|:--|:--|:--|
-| [mattpocock/skills](https://github.com/mattpocock/skills) | 工作流進專案、複製可客製、全域只放偏好 | plugin 發佈機制（一個人用不需要） |
-| [ponytail](https://github.com/DietrichGebert/ponytail) | YAGNI 決策階梯、最小可行、先復用再手寫 | — |
-| [bheadwei/claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw) | **計畫持久化**（/plan 存檔、/tdd 接續）、**session 記錄含失敗清單** | INDEX.md 索引、WBS 強耦合（目錄本身就是索引；plan 不該依賴 TaskMaster 才能用） |
-| [ECC](https://github.com/affaan-m/everything-claude-code) | 驗證迴圈、語言 reviewer agents（皆為複製的 md 檔，不依賴 plugin） | 全部 25+ 個 hooks（每次 tool call spawn node、flag 系統從未用過、plugin 未裝時整批靜默失敗） |
-| [speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw) / [humanizer](https://github.com/blader/humanizer) | 去 AI 味寫作層（中文台灣用語版 + 英文版，依語言自動分工） | Humanizer-zh（簡體語境，與台灣用語方向矛盾） |
-| 自己 | 同一概念只留一層（不疊 agent+command+style+skill 四層）、lean/strict 二分、writing 疊加層 | — |
+參考過的專案集中列在 README 的「參考來源」。
 
 ## 核心流程
 

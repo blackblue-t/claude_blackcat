@@ -19,12 +19,20 @@
 # Config (.claude/dispatch.conf, shell syntax):
 #   MAX_PARALLEL=2            # max concurrent sessions (default 2)
 #   DISPATCH_MODEL=opus       # default model for task sessions
-#   DISPATCH_PERMISSIONS=acceptEdits   # or: skip
-#     acceptEdits: file edits auto-approved; Bash commands still need
-#       project-level permission allowlists (git commit may be blocked
-#       unless the project allows it -- see README)
-#     skip: --dangerously-skip-permissions; full autonomy INSIDE the
-#       worktree. More capable, use only in projects you trust.
+#   DISPATCH_WINDOW=0         # 1 (or --windows): open each task in a real
+#                             # terminal window titled "bc-<slug>" so you can
+#                             # watch sessions live without mixing them up;
+#                             # window closes on success, stays open on error
+#   DISPATCH_PERMISSIONS=skip # or: acceptEdits
+#     skip (default): --dangerously-skip-permissions. Full autonomy inside
+#       the worktree. Field-tested rationale: acceptEdits blocks running
+#       verification commands, git add/commit, and .claude/ writes, so
+#       honest agents deadlock in status: pending and the dispatcher never
+#       returns. The real safety gates are elsewhere: file-scope rule in
+#       the task, review gate before main, and no push ever.
+#     acceptEdits: file edits auto-approved but command execution blocked
+#       unless the project allowlists it. Only for untrusted projects;
+#       expect tasks to stall unless allowlists cover the verify commands.
 #
 # Task file format (.claude/tasks/<slug>.md), written by /plan:
 #   ---
@@ -50,7 +58,8 @@ LOG_DIR="$PROJ/.claude/dispatch-logs"
 
 MAX_PARALLEL=2
 DISPATCH_MODEL="opus"
-DISPATCH_PERMISSIONS="acceptEdits"
+DISPATCH_PERMISSIONS="skip"
+DISPATCH_WINDOW=0
 [ -f "$CONF" ] && . "$CONF"
 
 MODE="run"
@@ -62,6 +71,7 @@ while [ $# -gt 0 ]; do
         --max) MAX_PARALLEL="$2"; shift ;;
         --model) DISPATCH_MODEL="$2"; shift ;;
         --save) SAVE=true ;;
+        --windows) DISPATCH_WINDOW=1 ;;
         --dry-run) DRY=true ;;
         --status) MODE="status" ;;
         --merge) MODE="merge" ;;
@@ -81,6 +91,7 @@ if [ "$SAVE" = true ]; then
         echo "MAX_PARALLEL=$MAX_PARALLEL"
         echo "DISPATCH_MODEL=$DISPATCH_MODEL"
         echo "DISPATCH_PERMISSIONS=$DISPATCH_PERMISSIONS"
+        echo "DISPATCH_WINDOW=$DISPATCH_WINDOW"
     } > "$CONF"
     echo "[conf] saved to $CONF"
 fi
@@ -106,7 +117,11 @@ branch_done() { # non-empty commits on task branch beyond base
 
 # ---------------------------------------------------------------- status ----
 if [ "$MODE" = "status" ]; then
-    echo "[status] base branch: $BASE_BRANCH / max parallel: $MAX_PARALLEL"
+    echo "[status] base branch: $BASE_BRANCH / configured max: $MAX_PARALLEL (conf/default)"
+    if [ -f "$LOG_DIR/last-run.info" ]; then
+        echo "[status] last run actual values:"
+        sed 's/^/    /' "$LOG_DIR/last-run.info"
+    fi
     [ -d "$TASKS_DIR" ] || { echo "  no .claude/tasks/ directory"; exit 0; }
     for t in "$TASKS_DIR"/*.md; do
         [ -f "$t" ] || continue
@@ -170,19 +185,6 @@ fi
 command -v claude >/dev/null 2>&1 || {
     echo "[error] claude CLI not found on PATH"; exit 1; }
 
-# Never dispatch straight off main/master: tasks would merge into main
-# BEFORE review. Create an integration branch instead -- review happens
-# there, and /commit merges it back into main only after verdict: pass.
-if [ "$BASE_BRANCH" = "main" ] || [ "$BASE_BRANCH" = "master" ]; then
-    INT_BRANCH="integrate/$(date +%Y%m%d-%H%M%S)"
-    git -C "$PROJ" switch -c "$INT_BRANCH" >/dev/null 2>&1 || {
-        echo "[error] could not create integration branch $INT_BRANCH"; exit 1; }
-    echo "[branch] on $BASE_BRANCH -- created integration branch $INT_BRANCH"
-    echo "         (tasks branch from and merge back into it; $BASE_BRANCH stays"
-    echo "         clean until /review-code passes and /commit merges it back)"
-    BASE_BRANCH="$INT_BRANCH"
-fi
-
 TASKS="$(pending_tasks)"
 if [ -z "$TASKS" ]; then
     echo "[run] no pending tasks in .claude/tasks/ -- generate them with /plan first"
@@ -193,7 +195,21 @@ COUNT=$(echo "$TASKS" | wc -l)
 echo "[run] $COUNT pending task(s), max $MAX_PARALLEL concurrent, model default: $DISPATCH_MODEL"
 echo "      permissions: $DISPATCH_PERMISSIONS / base: $BASE_BRANCH"
 
+# Never dispatch straight off main/master: tasks would merge into main
+# BEFORE review. An integration branch is created instead -- review happens
+# there, and /commit merges it back into main only after verdict: pass.
+NEED_INT=false
+if [ "$BASE_BRANCH" = "main" ] || [ "$BASE_BRANCH" = "master" ]; then
+    NEED_INT=true
+fi
+
 if [ "$DRY" = true ]; then
+    # dry-run is strictly read-only: no branch creation, no HEAD switch.
+    if [ "$NEED_INT" = true ]; then
+        echo "  [note] on $BASE_BRANCH: a real run would first create integration"
+        echo "         branch integrate/<timestamp> and switch to it ($BASE_BRANCH"
+        echo "         stays clean until /review-code passes and /commit merges back)"
+    fi
     for t in $TASKS; do
         slug="$(basename "$t" .md)"
         m="$(task_meta "$t" model)"; [ -n "$m" ] || m="$DISPATCH_MODEL"
@@ -202,10 +218,78 @@ if [ "$DRY" = true ]; then
     exit 0
 fi
 
-PERM_FLAGS="--permission-mode acceptEdits"
-[ "$DISPATCH_PERMISSIONS" = "skip" ] && PERM_FLAGS="--dangerously-skip-permissions"
+if [ "$NEED_INT" = true ]; then
+    INT_BRANCH="integrate/$(date +%Y%m%d-%H%M%S)"
+    git -C "$PROJ" switch -c "$INT_BRANCH" >/dev/null 2>&1 || {
+        echo "[error] could not create integration branch $INT_BRANCH"; exit 1; }
+    echo "[branch] on $BASE_BRANCH -- created integration branch $INT_BRANCH"
+    echo "         (tasks branch from and merge back into it; $BASE_BRANCH stays"
+    echo "         clean until /review-code passes and /commit merges it back)"
+    BASE_BRANCH="$INT_BRANCH"
+fi
+
+if [ "$DISPATCH_PERMISSIONS" = "skip" ]; then
+    PERM_FLAGS="--dangerously-skip-permissions"
+    echo "[perm] skip: sessions run fully autonomous inside their worktrees"
+    echo "       (safety gates: task file-scope rule, review gate, no push)"
+else
+    PERM_FLAGS="--permission-mode acceptEdits"
+    echo "[perm] WARNING: acceptEdits blocks command execution (verify commands,"
+    echo "       git add/commit, .claude/ writes) unless the project allowlists"
+    echo "       them -- tasks may deadlock in pending. Set"
+    echo "       DISPATCH_PERMISSIONS=skip in .claude/dispatch.conf for autonomy."
+fi
 
 mkdir -p "$LOG_DIR" "$WT_ROOT"
+{
+    echo "started: $(date '+%F %T')"
+    echo "max: $MAX_PARALLEL"
+    echo "model-default: $DISPATCH_MODEL"
+    echo "permissions: $DISPATCH_PERMISSIONS"
+    echo "window-mode: $DISPATCH_WINDOW"
+    echo "base: $BASE_BRANCH"
+} > "$LOG_DIR/last-run.info"
+
+task_prompt() { # $1=slug $2=branch
+    printf '%s' "\
+You are executing ONE isolated task in a dedicated git worktree on branch $2.
+Read .claude/tasks/$1.md and execute exactly that task -- nothing else.
+Rules:
+0. Follow this project's installed skills and coding rules (.claude/skills/, CLAUDE.md imports) -- e.g. if tdd-workflow is installed, work test-first.
+1. Only modify files listed in the task's 'files:' line, plus the task file itself and .claude/worklog.d/.
+2. Record your work in .claude/worklog.d/$1.md (sections: files / did / why / verify), creating the directory if needed.
+3. Run the verification steps listed in the task and record real results.
+4. Change 'status: pending' to 'status: done' in .claude/tasks/$1.md when (and only when) verification passes.
+5. git add your changed files and git commit on this branch with a conventional message. Do NOT push. Do NOT merge. Do NOT switch branches."
+}
+
+spawn_window() { # $1=title $2=runner script path
+    case "$(uname -s)" in
+        MINGW*|MSYS*|CYGWIN*)
+            local wbash wrun
+            wbash="$(cygpath -w /usr/bin/bash.exe 2>/dev/null || echo bash)"
+            wrun="$(cygpath -w "$2" 2>/dev/null || echo "$2")"
+            if command -v wt.exe >/dev/null 2>&1; then
+                wt.exe new-tab --title "$1" -- "$wbash" "$wrun" >/dev/null 2>&1 &
+            else
+                cmd //c start "$1" "$wbash" "$wrun" >/dev/null 2>&1 &
+            fi
+            ;;
+        Darwin)
+            osascript -e "tell application \"Terminal\" to do script \"bash '$2'\"" >/dev/null 2>&1 &
+            ;;
+        *)
+            if command -v gnome-terminal >/dev/null 2>&1; then
+                gnome-terminal --title "$1" -- bash "$2" >/dev/null 2>&1 &
+            elif command -v xterm >/dev/null 2>&1; then
+                xterm -T "$1" -e bash "$2" >/dev/null 2>&1 &
+            else
+                echo "  [warn] no terminal emulator found -- running this task headless"
+                bash "$2" >/dev/null 2>&1 &
+            fi
+            ;;
+    esac
+}
 
 launch_task() { # $1=task file
     local t="$1"
@@ -217,31 +301,56 @@ launch_task() { # $1=task file
     if [ ! -d "$wt" ]; then
         git -C "$PROJ" worktree add -b "$branch" "$wt" "$BASE_BRANCH" >/dev/null 2>&1 \
             || git -C "$PROJ" worktree add "$wt" "$branch" >/dev/null 2>&1 \
-            || { echo "  [error] $slug: cannot create worktree"; return 0; }
+            || { echo "  [error] $slug: cannot create worktree"; touch "$LOG_DIR/$slug.done"; return 0; }
     fi
-    echo "  [launch] $slug -> $branch (model: $model, log: .claude/dispatch-logs/$slug.log)"
-    (
-        cd "$wt" && claude -p "$(printf '%s' "\
-You are executing ONE isolated task in a dedicated git worktree on branch $branch.
-Read .claude/tasks/$slug.md and execute exactly that task -- nothing else.
-Rules:
-1. Only modify files listed in the task's 'files:' line, plus the task file itself and .claude/worklog.d/.
-2. Record your work in .claude/worklog.d/$slug.md (sections: files / did / why / verify), creating the directory if needed.
-3. Run the verification steps listed in the task and record real results.
-4. Change 'status: pending' to 'status: done' in .claude/tasks/$slug.md when (and only when) verification passes.
-5. git add your changed files and git commit on this branch with a conventional message. Do NOT push. Do NOT merge. Do NOT switch branches.")" \
-            --model "$model" $PERM_FLAGS
-    ) > "$LOG_DIR/$slug.log" 2>&1 &
+    if [ "$DISPATCH_WINDOW" = 1 ]; then
+        echo "  [window] $slug -> $branch (model: $model, title: bc-$slug)"
+        task_prompt "$slug" "$branch" > "$LOG_DIR/$slug.prompt"
+        # Runner script avoids nested-quoting hell across cmd/wt/osascript.
+        # Sets the terminal title, runs the session, drops a .done sentinel;
+        # window closes on success and stays open for inspection on error.
+        cat > "$LOG_DIR/$slug.run.sh" <<RUNNER
+#!/bin/bash
+printf '\033]0;bc-$slug\007'
+cd "$wt" || { echo "[error] cannot cd to worktree"; read -r; exit 1; }
+claude -p "\$(cat "$LOG_DIR/$slug.prompt")" --model "$model" $PERM_FLAGS 2>&1 | tee "$LOG_DIR/$slug.log"
+rc=\${PIPESTATUS[0]}
+touch "$LOG_DIR/$slug.done"
+if [ "\$rc" != 0 ]; then
+    echo ""
+    echo "[bc-$slug] session exited with code \$rc -- press Enter to close"
+    read -r
+fi
+RUNNER
+        chmod +x "$LOG_DIR/$slug.run.sh"
+        spawn_window "bc-$slug" "$LOG_DIR/$slug.run.sh"
+    else
+        echo "  [launch] $slug -> $branch (model: $model, log: .claude/dispatch-logs/$slug.log)"
+        (
+            cd "$wt" && claude -p "$(task_prompt "$slug" "$branch")" \
+                --model "$model" $PERM_FLAGS
+            touch "$LOG_DIR/$slug.done"
+        ) > "$LOG_DIR/$slug.log" 2>&1 &
+    fi
 }
 
-active=0
+# Pool control is sentinel-based (.done files) so it works for both modes:
+# windowed sessions are detached processes we cannot wait(1) on.
+rm -f "$LOG_DIR"/*.done "$LOG_DIR"/*.run.sh "$LOG_DIR"/*.prompt 2>/dev/null || true
+done_count() { ls "$LOG_DIR"/*.done 2>/dev/null | wc -l; }
+
+LAUNCHED=0
 for t in $TASKS; do
-    while [ "$(jobs -rp | wc -l)" -ge "$MAX_PARALLEL" ]; do
-        wait -n || true
+    while [ $((LAUNCHED - $(done_count))) -ge "$MAX_PARALLEL" ]; do
+        sleep 5
     done
     launch_task "$t"
+    LAUNCHED=$((LAUNCHED+1))
 done
-wait || true
+while [ "$(done_count)" -lt "$LAUNCHED" ]; do
+    sleep 5
+done
+wait 2>/dev/null || true
 
 echo ""
 echo "[run] all sessions finished. Results:"

@@ -35,21 +35,50 @@ model: claude-fable-5
 - **安全**：秘密硬編碼、注入、未驗證輸入。
 - **一致性**：命名、風格是否貼合周邊程式碼；有沒有多餘的複雜度。
 - **驗證缺口**：worklog 標了 `verify: 未驗證` 的條目，指出該補什麼驗證。
+- **測試品質**：拿 UI 文案當斷言（改文字就紅）、快照全包、為覆蓋率
+  湊數的測試——標 `[fix]`，要求改用 role / data-testid 與行為斷言,
+  或直接刪掉湊數的。
 
-### 3. 結論寫回 worklog
+### 3. 每個 finding 標分級（判斷權在審查者，用清單不用感覺）
+
+- **`fix`**：可直接修。必須**同時**滿足：不改公開介面/函式簽名/API 格式、
+  不改資料格式或 schema、不新增依賴或檔案（測試檔除外）、不違背
+  requirements 文件寫明的行為。
+- **`design`**：上面任一條不滿足，但需求本身沒問題 → 回 `/plan` 調架構。
+- **`requirement`**：問題出在需求矛盾或漏洞 → 回 `/grill` 補需求。
+
+**只要有一個 `design`/`requirement` 級 finding，整輪不進入直接修流程**
+——先解決高層級問題（它可能讓小修白做）。
+
+### 4. 結論寫回 worklog
 
 把審查結論**追加**到 `.claude/worklog.md`：
 
 ```markdown
-## Review
-- verdict: pass          # 或 needs-fix
+## Review (round N)
+- verdict: pass          # 或 needs-fix / escalate
 - scope: <審查了哪些檔案>
 - findings:
-  - <嚴重度> <檔案:行> <問題與建議>   # pass 且無發現時寫 none
+  - [fix] <檔案:行> <問題與建議>       # pass 且無發現時寫 none
+  - [design] <...>
 ```
 
-### 4. 收尾
+### 5. 收尾（依 verdict）
 
 - **pass** → 提醒使用者跑 `/commit` 完成提交。
-- **needs-fix** → 列出待修項；修完後重跑 `/review-code`，新一輪結論
-  會再追加一條 Review 條目。
+- **needs-fix**（全部是 `fix` 級）→ 列出待修項，指示：**由主 session
+  （執行模型）修**，不是本 session——修的人與審的人分離。主 session
+  每修一項在 worklog 追加 `## Fix:` 條目（含 files/did/verify）。
+- **escalate**（含 `design`/`requirement` 級）→ 指路回 `/plan` 或
+  `/grill`，本輪不修任何東西。
+
+### 6. 限縮重審（第 2 輪起）
+
+worklog 裡已有 `## Review (round N)` 和對應 `## Fix:` 條目時，本次是
+限縮重審：
+
+- **只看**上一輪每個 finding + 對應的 Fix 條目 + 修復檔案的 diff +
+  驗證結果——確認真的修了、沒修出新問題。上輪已 pass 的部分不重看。
+- 修復的 diff 要親自看，不是聽 Fix 條目說修好了就信。
+- **上限 2 輪**：同一個 finding 第 2 輪還過不了，或累計已審 2 輪，
+  寫 `verdict: escalate` 停下來交使用者裁決，不准第 3 輪自動循環。

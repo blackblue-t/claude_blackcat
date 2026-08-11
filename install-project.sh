@@ -3,7 +3,7 @@
 # claude_blackcat project installer
 # COPIES selected skills / commands / agents / output-styles into a target
 # project's .claude/ directory. Copy, not symlink: once installed the files
-# belong to the project and can be customized freely (mattpocock-style).
+# belong to the project and can be customized freely.
 #
 # Usage:
 #   bash install-project.sh <project-path> --lean       # fast iteration: ponytail (YAGNI minimal)
@@ -61,9 +61,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # (plan on Fable -> execute on the session model writing .claude/worklog.md
 # -> review-code on Fable reads only that scope -> commit on sonnet).
 LEAN_SKILLS="ponytail ponytail-review worklog"
-LEAN_COMMANDS="grill plan dispatch review-code commit save-session"
+LEAN_COMMANDS="go grill grill-ui plan plans dispatch merge review-code commit learn save-session"
 STRICT_SKILLS="tdd-workflow verification-loop worklog"
-STRICT_COMMANDS="grill plan dispatch tdd verify review-code commit save-session"
+STRICT_COMMANDS="go grill grill-ui plan plans spec dispatch merge tdd verify review-code commit learn save-session"
 WRITING_SKILLS="speak-human-tw humanizer"
 
 list_items() {
@@ -111,7 +111,13 @@ UPDATE_ONLY=false
 MODEL_PICK=false
 FORCE_MODELS=false
 GRAPHIFY=false
+UI=false
+UI_REFRESH=false
+USAGE_MODE=false
 PRESET="lean"
+
+UI_COMMANDS="ui-style ui-site ui-page"
+UI_AGENTS="ui-builder"
 SKILLS=""
 COMMANDS=""
 AGENTS=""
@@ -129,6 +135,9 @@ while [ $# -gt 0 ]; do
         --update) UPDATE_ONLY=true ;;
         --models) FORCE_MODELS=true ;;
         --graphify) GRAPHIFY=true ;;
+        --ui) UI=true ;;
+        --ui-refresh) UI_REFRESH=true ;;
+        --usage|--skill-freq) USAGE_MODE=true ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
         --commands) COMMANDS="${2//,/ }"; shift ;;
         --agents) AGENTS="${2//,/ }"; shift ;;
@@ -137,6 +146,72 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
+
+# ---------------------------------------------------------------- usage ----
+# blackcat --usage (alias --skill-freq): count how often each skill /
+# command / agent was actually used in this project, by scanning Claude
+# Code's own session transcripts (~/.claude/projects/<encoded-path>/*.jsonl).
+# Zero runtime cost -- no hooks, purely retroactive analysis.
+if [ "$USAGE_MODE" = true ]; then
+    PROJ_STORE="$HOME/.claude/projects"
+    ENC="$(printf '%s' "$TARGET" | sed 's|[^A-Za-z0-9]|-|g')"
+    TDIR="$PROJ_STORE/$ENC"
+    if [ ! -d "$TDIR" ]; then
+        # fallback: suffix match on the encoded basename
+        BASE_ENC="$(basename "$TARGET" | sed 's|[^A-Za-z0-9]|-|g')"
+        CAND="$(ls "$PROJ_STORE" 2>/dev/null | grep -- "-$BASE_ENC$" | head -1)"
+        [ -n "$CAND" ] && TDIR="$PROJ_STORE/$CAND"
+    fi
+    N_FILES="$(ls "$TDIR"/*.jsonl 2>/dev/null | wc -l)"
+    if [ ! -d "$TDIR" ] || [ "$N_FILES" -eq 0 ]; then
+        echo "[usage] no session transcripts found for this project"
+        echo "        (looked in $PROJ_STORE/$ENC)"
+        exit 0
+    fi
+    echo "[usage] scanning $N_FILES session transcript(s) in $(basename "$TDIR")"
+    echo ""
+    echo "-- skills (times invoked) --"
+    grep -ho '"skill"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
+        | sed 's/.*"skill"[[:space:]]*:[[:space:]]*"//;s/"$//' \
+        | sort | uniq -c | sort -rn || true
+    grep -ho '"skill"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
+        | grep -q . || echo "  (none recorded)"
+    echo ""
+    echo "-- commands (times run) --"
+    grep -ho '<command-name>[^<]*</command-name>' "$TDIR"/*.jsonl 2>/dev/null \
+        | sed 's|<command-name>/\{0,1\}||;s|</command-name>||' \
+        | sort | uniq -c | sort -rn || true
+    grep -ho '<command-name>' "$TDIR"/*.jsonl 2>/dev/null | grep -q . \
+        || echo "  (none recorded)"
+    echo ""
+    echo "-- agents (times dispatched) --"
+    grep -ho '"subagent_type"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
+        | sed 's/.*: *"//;s/"$//' | sort | uniq -c | sort -rn || true
+    grep -ho '"subagent_type"' "$TDIR"/*.jsonl 2>/dev/null | grep -q . \
+        || echo "  (none recorded)"
+    echo ""
+    echo "-- installed but never seen in these transcripts --"
+    UNUSED=0
+    for d in "$DEST"/skills/*/; do
+        [ -d "$d" ] || continue
+        n="$(basename "$d")"
+        grep -q "\"skill\"[[:space:]]*:[[:space:]]*\"$n\"" "$TDIR"/*.jsonl 2>/dev/null \
+            || { echo "  skill:   $n"; UNUSED=$((UNUSED+1)); }
+    done
+    for f in "$DEST"/commands/*.md; do
+        [ -f "$f" ] || continue
+        n="$(basename "$f" .md)"
+        grep -q "<command-name>/\{0,1\}$n<" "$TDIR"/*.jsonl 2>/dev/null \
+            || { echo "  command: /$n"; UNUSED=$((UNUSED+1)); }
+    done
+    [ "$UNUSED" -eq 0 ] && echo "  (everything installed has been used at least once)"
+    echo ""
+    echo "[caveats] Counts cover sessions recorded on THIS machine for THIS"
+    echo "          project path only. Transcripts are pruned by Claude Code's"
+    echo "          retention setting, and worktree/headless sessions log under"
+    echo "          their own paths -- treat numbers as a floor, not exact."
+    exit 0
+fi
 
 if [ "$ALL" = true ]; then
     SKILLS=$(ls "$SCRIPT_DIR/skills")
@@ -160,6 +235,50 @@ fi
 if [ "$WRITING" = true ] && [ "$ALL" != true ]; then
     SKILLS="$SKILLS $WRITING_SKILLS"
     echo "[writing] adding: $WRITING_SKILLS"
+fi
+
+# ---- preset switch detection --------------------------------------------
+# lean and strict are mutually exclusive (ponytail says "minimal checks",
+# tdd-workflow says "80%+ coverage" -- both trigger on every coding task).
+# If the OTHER preset's skills are already in the project, offer to move
+# them out before installing this one.
+if [ "$ALL" != true ] && [ "$UPDATE_ONLY" != true ]; then
+    if [ "$PRESET" = "strict" ]; then
+        OTHER_SKILLS="$LEAN_SKILLS"; OTHER_NAME="lean"
+    else
+        OTHER_SKILLS="$STRICT_SKILLS"; OTHER_NAME="strict"
+    fi
+    CONFLICTS=""
+    for s in $OTHER_SKILLS; do
+        case " $SKILLS " in *" $s "*) continue ;; esac   # shared skills are fine
+        [ -d "$DEST/skills/$s" ] && CONFLICTS="$CONFLICTS $s"
+    done
+    if [ -n "$CONFLICTS" ]; then
+        echo ""
+        echo "[preset] CONFLICT: this project has $OTHER_NAME skills installed:$CONFLICTS"
+        echo "         lean and strict are mutually exclusive -- keeping both gives"
+        echo "         the model contradictory instructions on every coding task."
+        if [ -t 0 ]; then
+            printf "Switch to %s? (moves conflicting skills to .claude/backups) [y/N] " "$PRESET"
+            read -r ans || ans=""
+            case "$ans" in
+                y|Y|yes|YES)
+                    BK="$DEST/backups/preset-switch-$(date +%Y%m%d-%H%M%S)"
+                    mkdir -p "$BK"
+                    for s in $CONFLICTS; do
+                        mv "$DEST/skills/$s" "$BK/$s"
+                        echo "  [moved] skills/$s -> $BK"
+                    done
+                    echo "  (leftover $OTHER_NAME-only commands are harmless -- they only run when invoked)"
+                    ;;
+                *)
+                    echo "  [warn] keeping both presets -- behavior will be unpredictable"
+                    ;;
+            esac
+        else
+            echo "         (non-interactive: not touching them -- remove manually or re-run interactively)"
+        fi
+    fi
 fi
 
 mkdir -p "$DEST"
@@ -486,6 +605,111 @@ if [ "$UPDATE_ONLY" != true ]; then
         case "$ans" in
             y|Y|yes|YES) install_graphify ;;
             *) ;;
+        esac
+    fi
+fi
+
+# ------------------------------------------------------------------- ui ----
+# Frontend pack (opt-in; dead weight for backend-only projects):
+# /ui-style -> DESIGN.md tokens, /ui-site -> IA + stubs, /ui-page -> deepen
+# one page via the ui-builder agent. Pencil MCP recommended for design sync.
+install_ui() {
+    echo "[ui] installing frontend pack"
+    for c in $UI_COMMANDS; do install_md commands "$c"; done
+    for a in $UI_AGENTS; do install_md agents "$a"; done
+    # Hallmark (github.com/nutlope/hallmark, MIT): anti-AI-slop design
+    # skill -- 20 themes + 57 slop-test gates. Copied into the project
+    # (own-and-customize); not a repo skill, so blackcat's update/cleanup
+    # mechanisms deliberately ignore it.
+    if [ -d "$DEST/skills/hallmark" ]; then
+        echo "  [keep] skills/hallmark (already installed)"
+    else
+        echo "  [hallmark] fetching nutlope/hallmark (anti-AI-slop design skill)..."
+        _hmtmp="$DEST/.hallmark-tmp"
+        rm -rf "$_hmtmp"
+        if git clone --depth 1 https://github.com/nutlope/hallmark "$_hmtmp" >/dev/null 2>&1 \
+           && [ -d "$_hmtmp/skills/hallmark" ]; then
+            mkdir -p "$DEST/skills"
+            cp -r "$_hmtmp/skills/hallmark" "$DEST/skills/hallmark"
+            echo "  [copy] skills/hallmark (20 themes + slop-test gates)"
+        else
+            echo "  [skip] could not fetch hallmark (offline?). Add later with:"
+            echo "         npx skills add nutlope/hallmark"
+        fi
+        rm -rf "$_hmtmp"
+    fi
+    # ui-ux-pro-max (github.com/nextlevelbuilder/ui-ux-pro-max-skill):
+    # searchable design DB (styles/palettes/font pairings/UX guidelines/
+    # a11y checks) queried via its own script -- low context cost. Role
+    # split: pro-max = knowledge base, hallmark = anti-slop personality,
+    # DESIGN.md = the project contract that always wins.
+    if [ -d "$DEST/skills/ui-ux-pro-max" ]; then
+        echo "  [keep] skills/ui-ux-pro-max (already installed)"
+    else
+        echo "  [ui-ux-pro-max] fetching design intelligence DB..."
+        _upmtmp="$DEST/.upm-tmp"
+        rm -rf "$_upmtmp"
+        if git clone --depth 1 https://github.com/nextlevelbuilder/ui-ux-pro-max-skill "$_upmtmp" >/dev/null 2>&1; then
+            _upmsrc=""
+            if [ -f "$_upmtmp/SKILL.md" ]; then
+                _upmsrc="$_upmtmp"
+            else
+                _upmfound="$(find "$_upmtmp" -name SKILL.md -not -path '*/.git/*' 2>/dev/null | head -1)"
+                [ -n "$_upmfound" ] && _upmsrc="$(dirname "$_upmfound")"
+            fi
+            if [ -n "$_upmsrc" ] && [ -f "$_upmsrc/SKILL.md" ]; then
+                mkdir -p "$DEST/skills"
+                cp -r "$_upmsrc" "$DEST/skills/ui-ux-pro-max"
+                rm -rf "$DEST/skills/ui-ux-pro-max/.git"
+                echo "  [copy] skills/ui-ux-pro-max (styles/palettes/UX guidelines DB)"
+            else
+                echo "  [skip] ui-ux-pro-max: unexpected repo layout"
+            fi
+        else
+            echo "  [skip] could not fetch ui-ux-pro-max (offline?)"
+        fi
+        rm -rf "$_upmtmp"
+    fi
+    # pen CLI (@pencil.dev/cli): headless .pen engine -- agent, MCP tools,
+    # PNG/JPEG/WEBP/PDF export -- no desktop app needed. Auth: pen login.
+    if command -v pen >/dev/null 2>&1; then
+        echo "  [ok] pen CLI detected -- canvas-first flow available"
+        echo "       (.pen mockups + headless PNG export; auth via: pen login)"
+    else
+        echo "  [note] optional canvas-first flow needs the pen CLI:"
+        echo "         npm install -g @pencil.dev/cli   (Node 18+), then: pen login"
+        echo "         MCP wiring: see https://docs.pencil.dev/for-developers/pen-cli"
+        echo "         (the pencil desktop app wires its MCP automatically instead)"
+    fi
+}
+
+# --ui-refresh: externally fetched skills (hallmark, ui-ux-pro-max) are
+# pinned at whatever was latest when installed and are ignored by the
+# normal update flow (they are not this repo's files). This re-fetches
+# them, backing up the old copies first.
+if [ "$UI_REFRESH" = true ] && [ "$UPDATE_ONLY" != true ]; then
+    _bku="$DEST/backups/ui-refresh-$(date +%Y%m%d-%H%M%S)"
+    for s in hallmark ui-ux-pro-max; do
+        if [ -d "$DEST/skills/$s" ]; then
+            mkdir -p "$_bku"
+            mv "$DEST/skills/$s" "$_bku/$s"
+            echo "[ui-refresh] backed up skills/$s -> $_bku"
+        fi
+    done
+    UI=true
+fi
+
+if [ "$UPDATE_ONLY" != true ]; then
+    if [ "$UI" = true ]; then
+        echo ""
+        install_ui
+    elif [ -t 0 ] && [ "$MODEL_PICK" = true ] && [ ! -f "$DEST/commands/ui-style.md" ]; then
+        echo ""
+        printf "[ui] Will this project have a frontend? Install the UI pack (/ui-style /ui-site /ui-page)? [y/N] "
+        read -r ans || ans=""
+        case "$ans" in
+            y|Y|yes|YES) install_ui ;;
+            *) echo "  (add it later any time with: blackcat --ui)" ;;
         esac
     fi
 fi
