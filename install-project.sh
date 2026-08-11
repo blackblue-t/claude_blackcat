@@ -206,11 +206,20 @@ if [ "$USAGE_MODE" = true ]; then
     echo ""
     echo "-- installed but never seen in these transcripts --"
     UNUSED=0
+    # A skill can be used WITHOUT a Skill tool call: some ship a CLI that the
+    # model runs via Bash (graphify), or are applied by following CLAUDE.md
+    # instructions. Count a skill as used if its name appears in a Skill call
+    # OR anywhere in a Bash command, so we do not report false negatives.
     for d in "$DEST"/skills/*/; do
         [ -d "$d" ] || continue
         n="$(basename "$d")"
-        grep -q "\"skill\"[[:space:]]*:[[:space:]]*\"$n\"" "$TDIR"/*.jsonl 2>/dev/null \
-            || { echo "  skill:   $n"; UNUSED=$((UNUSED+1)); }
+        if grep -q "\"skill\"[[:space:]]*:[[:space:]]*\"$n\"" "$TDIR"/*.jsonl 2>/dev/null; then
+            continue
+        elif grep -q "\"command\"[[:space:]]*:[[:space:]]*\"[^\"]*$n" "$TDIR"/*.jsonl 2>/dev/null; then
+            echo "  skill:   $n (no Skill call, but its CLI/name appears in Bash -- likely used indirectly)"
+        else
+            echo "  skill:   $n"; UNUSED=$((UNUSED+1))
+        fi
     done
     for f in "$DEST"/commands/*.md; do
         [ -f "$f" ] || continue
@@ -226,6 +235,10 @@ if [ "$USAGE_MODE" = true ]; then
     echo "[how to read this]"
     echo "  - An unused SKILL whose matching command ran a lot = the skill never"
     echo "    auto-triggered. Either drop it, or force it via a line in CLAUDE.md."
+    echo "  - Auto-triggering is driven by the skill's description text and is"
+    echo "    best-effort. A vague description = a skill that never fires."
+    echo "  - This only sees Skill tool calls and Bash mentions; a skill applied"
+    echo "    purely by the model reading its rules is invisible here."
     echo "  - Lean skills (ponytail*) sitting in a strict project (or vice versa)"
     echo "    are preset leftovers -- run blackcat --strict / --lean to switch"
     echo "    cleanly (conflicting skills get moved to .claude/backups/)."
