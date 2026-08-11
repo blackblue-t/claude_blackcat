@@ -61,14 +61,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # (plan on Fable -> execute on the session model writing .claude/worklog.md
 # -> review-code on Fable reads only that scope -> commit on sonnet).
 LEAN_SKILLS="ponytail ponytail-review worklog"
-LEAN_COMMANDS="go grill grill-ui plan tidy dispatch merge review-code commit learn save-session"
+LEAN_COMMANDS="go grill grill-ui plan clean-plan dispatch merge review-code commit learn save-session"
 STRICT_SKILLS="tdd-workflow verification-loop worklog"
-STRICT_COMMANDS="go grill grill-ui plan tidy spec dispatch merge tdd verify review-code commit learn save-session"
+STRICT_COMMANDS="go grill grill-ui plan clean-plan spec dispatch merge tdd verify review-code commit learn save-session"
 
 # Items renamed in this repo: "<old> <new>" pairs. When the new one installs,
 # the stale old copy is moved to backups so projects do not keep both.
-# (/plans -> /tidy: one letter from /plan, too easy to mistype.)
-RENAMED_COMMANDS="plans:tidy"
+# (/plans and /tidy -> /clean-plan: explicit name, no near-miss with /plan.)
+RENAMED_COMMANDS="plans:clean-plan tidy:clean-plan"
 WRITING_SKILLS="speak-human-tw humanizer"
 
 list_items() {
