@@ -61,9 +61,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # (plan on Fable -> execute on the session model writing .claude/worklog.md
 # -> review-code on Fable reads only that scope -> commit on sonnet).
 LEAN_SKILLS="ponytail ponytail-review worklog"
-LEAN_COMMANDS="go grill grill-ui plan plans dispatch merge review-code commit learn save-session"
+LEAN_COMMANDS="go grill grill-ui plan clean-plan dispatch merge review-code commit learn save-session"
 STRICT_SKILLS="tdd-workflow verification-loop worklog"
-STRICT_COMMANDS="go grill grill-ui plan plans spec dispatch merge tdd verify review-code commit learn save-session"
+STRICT_COMMANDS="go grill grill-ui plan clean-plan spec dispatch merge tdd verify review-code commit learn save-session"
+
+# Items renamed in this repo: "<old> <new>" pairs. When the new one installs,
+# the stale old copy is moved to backups so projects do not keep both.
+# (/plans and /tidy -> /clean-plan: explicit name, no near-miss with /plan.)
+RENAMED_COMMANDS="plans:clean-plan tidy:clean-plan"
 WRITING_SKILLS="speak-human-tw humanizer"
 
 list_items() {
@@ -169,34 +174,57 @@ if [ "$USAGE_MODE" = true ]; then
         exit 0
     fi
     echo "[usage] scanning $N_FILES session transcript(s) in $(basename "$TDIR")"
-    echo ""
-    echo "-- skills (times invoked) --"
+    # Built-ins are Claude Code's own, not installed by this repo -- counting
+    # them together with project items makes the report misleading.
+    BUILTIN_CMDS="(clear|compact|resume-session|resume|mcp|model|config|help|cost|status|login|logout|agents|context|export|memory|doctor|fast|loop|vim|terminal-setup|add-dir|permissions|hooks|output-style|statusline|todos|bug|release-notes|upgrade|privacy-settings|exit|quit)"
+    BUILTIN_AGENTS="(general-purpose|Explore|Plan|claude|statusline-setup|claude-code-guide|output-style-setup)"
+    BUILTIN_SKILLS="(artifact-design|artifact-capabilities|artifact-diagramming|dataviz|skill-creator|pdf|docx|xlsx|pptx|grilling|update-config|simplify|run|morning|init)"
+
+    TMPU="$TDIR/.bc-usage.tmp"
     grep -ho '"skill"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
-        | sed 's/.*"skill"[[:space:]]*:[[:space:]]*"//;s/"$//' \
-        | sort | uniq -c | sort -rn || true
-    grep -ho '"skill"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
-        | grep -q . || echo "  (none recorded)"
-    echo ""
-    echo "-- commands (times run) --"
+        | sed 's/.*"skill"[[:space:]]*:[[:space:]]*"//;s/"$//' | sort | uniq -c | sort -rn > "$TMPU.sk" || true
     grep -ho '<command-name>[^<]*</command-name>' "$TDIR"/*.jsonl 2>/dev/null \
-        | sed 's|<command-name>/\{0,1\}||;s|</command-name>||' \
-        | sort | uniq -c | sort -rn || true
-    grep -ho '<command-name>' "$TDIR"/*.jsonl 2>/dev/null | grep -q . \
-        || echo "  (none recorded)"
-    echo ""
-    echo "-- agents (times dispatched) --"
+        | sed 's|<command-name>/\{0,1\}||;s|</command-name>||' | sort | uniq -c | sort -rn > "$TMPU.cm" || true
     grep -ho '"subagent_type"[[:space:]]*:[[:space:]]*"[^"]*"' "$TDIR"/*.jsonl 2>/dev/null \
-        | sed 's/.*: *"//;s/"$//' | sort | uniq -c | sort -rn || true
-    grep -ho '"subagent_type"' "$TDIR"/*.jsonl 2>/dev/null | grep -q . \
-        || echo "  (none recorded)"
+        | sed 's/.*: *"//;s/"$//' | sort | uniq -c | sort -rn > "$TMPU.ag" || true
+
+    echo ""
+    echo "-- YOUR commands (times run) --"
+    grep -vE "^ *[0-9]+ $BUILTIN_CMDS\$" "$TMPU.cm" 2>/dev/null \
+        | awk 'NF' | grep . || echo "  (none recorded)"
+    echo ""
+    echo "-- YOUR skills (times the Skill tool fired) --"
+    echo "   note: slash commands also dispatch through the Skill tool, so names"
+    echo "   matching your commands are command runs, not skill auto-triggers."
+    grep -vE "^ *[0-9]+ $BUILTIN_SKILLS\$" "$TMPU.sk" 2>/dev/null \
+        | awk 'NF' | grep . || echo "  (none recorded)"
+    echo ""
+    echo "-- YOUR agents (times dispatched) --"
+    grep -vE "^ *[0-9]+ $BUILTIN_AGENTS\$" "$TMPU.ag" 2>/dev/null \
+        | awk 'NF' | grep . || echo "  (none -- built-in agents only)"
+    echo ""
+    echo "-- built-in Claude Code usage (not installed by blackcat) --"
+    printf "  commands: "; grep -E "^ *[0-9]+ $BUILTIN_CMDS\$" "$TMPU.cm" 2>/dev/null | awk '{printf "%s(%s) ", $2, $1}'; echo ""
+    printf "  agents:   "; grep -E "^ *[0-9]+ $BUILTIN_AGENTS\$" "$TMPU.ag" 2>/dev/null | awk '{printf "%s(%s) ", $2, $1}'; echo ""
+    printf "  skills:   "; grep -E "^ *[0-9]+ $BUILTIN_SKILLS\$" "$TMPU.sk" 2>/dev/null | awk '{printf "%s(%s) ", $2, $1}'; echo ""
+    rm -f "$TMPU".sk "$TMPU".cm "$TMPU".ag
     echo ""
     echo "-- installed but never seen in these transcripts --"
     UNUSED=0
+    # A skill can be used WITHOUT a Skill tool call: some ship a CLI that the
+    # model runs via Bash (graphify), or are applied by following CLAUDE.md
+    # instructions. Count a skill as used if its name appears in a Skill call
+    # OR anywhere in a Bash command, so we do not report false negatives.
     for d in "$DEST"/skills/*/; do
         [ -d "$d" ] || continue
         n="$(basename "$d")"
-        grep -q "\"skill\"[[:space:]]*:[[:space:]]*\"$n\"" "$TDIR"/*.jsonl 2>/dev/null \
-            || { echo "  skill:   $n"; UNUSED=$((UNUSED+1)); }
+        if grep -q "\"skill\"[[:space:]]*:[[:space:]]*\"$n\"" "$TDIR"/*.jsonl 2>/dev/null; then
+            continue
+        elif grep -q "\"command\"[[:space:]]*:[[:space:]]*\"[^\"]*$n" "$TDIR"/*.jsonl 2>/dev/null; then
+            echo "  skill:   $n (no Skill call, but its CLI/name appears in Bash -- likely used indirectly)"
+        else
+            echo "  skill:   $n"; UNUSED=$((UNUSED+1))
+        fi
     done
     for f in "$DEST"/commands/*.md; do
         [ -f "$f" ] || continue
@@ -205,6 +233,22 @@ if [ "$USAGE_MODE" = true ]; then
             || { echo "  command: /$n"; UNUSED=$((UNUSED+1)); }
     done
     [ "$UNUSED" -eq 0 ] && echo "  (everything installed has been used at least once)"
+    # A skill listed as unused whose matching command DID run means the skill
+    # never auto-triggered -- the command carried the work. That is a wiring
+    # problem (skill auto-trigger is best-effort), not necessarily dead weight.
+    echo ""
+    echo "[how to read this]"
+    echo "  - An unused SKILL whose matching command ran a lot = the skill never"
+    echo "    auto-triggered. Either drop it, or force it via a line in CLAUDE.md."
+    echo "  - Auto-triggering is driven by the skill's description text and is"
+    echo "    best-effort. A vague description = a skill that never fires."
+    echo "  - This only sees Skill tool calls and Bash mentions; a skill applied"
+    echo "    purely by the model reading its rules is invisible here."
+    echo "  - Lean skills (ponytail*) sitting in a strict project (or vice versa)"
+    echo "    are preset leftovers -- run blackcat --strict / --lean to switch"
+    echo "    cleanly (conflicting skills get moved to .claude/backups/)."
+    echo "  - Low-frequency is not the same as useless: some items are monthly"
+    echo "    (e.g. /plans) or situational (e.g. writing pack)."
     echo ""
     echo "[caveats] Counts cover sessions recorded on THIS machine for THIS"
     echo "          project path only. Transcripts are pruned by Claude Code's"
@@ -283,6 +327,17 @@ fi
 
 mkdir -p "$DEST"
 echo "[target] $DEST"
+
+# Retire renamed commands before installing (backup, never delete).
+for pair in $RENAMED_COMMANDS; do
+    _old="${pair%%:*}"; _new="${pair#*:}"
+    if [ -f "$DEST/commands/$_old.md" ]; then
+        _bkr="$DEST/backups/renamed-$(date +%Y%m%d-%H%M%S)"
+        mkdir -p "$_bkr"
+        mv "$DEST/commands/$_old.md" "$_bkr/$_old.md"
+        echo "  [renamed] /$_old -> /$_new (old copy backed up)"
+    fi
+done
 
 # Skill directories are copied whole; existing ones are kept untouched
 # (the project may have customized them).

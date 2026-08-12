@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.31**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.35**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -145,6 +145,7 @@ user 提需求（日常直接 /go，以下是它串起來的全圖）
   ▼
 user check：git log 確認、push 由你決定 → /dispatch --clean 收 worktree
   └─ 收尾可跑 /learn：把本次教訓蒸餾進 CLAUDE.md（下個 session 不再踩）
+     `.claude/` 堆亂了跑 /clean-plan：完成的計畫/任務整包歸檔、爛尾的問你續作或棄置
 ```
 
 **前端專案**另有三部曲（初始化時選裝或 `blackcat --ui` 隨時加）：`/ui-style`（問答定風格 → DESIGN.md tokens，**品牌色優先**——給 hex 就生成整套色階、語意 tokens、深色版與 WCAG 對比檢查）→ `/ui-site`（IA 契約 + 路由 stubs）→ `/ui-page <路徑>`（單頁深化，委派 ui-builder agent，附風格合規自檢）。裝 UI pack 時會自動抓兩個 skill 進專案 `.claude/skills/`，分工明確：[Hallmark](https://github.com/nutlope/hallmark)（MIT）是**視覺個性層**——20 種主題 + 57 道 slop-test 檢查關，專殺紫漸層和模板臉，另有 `audit`／`study`；[ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 是 **UX 知識庫層**——可查詢的設計資料庫（50+ 風格、97 色盤、57 字體配對、99 條 UX 準則、a11y 檢查），用腳本查詢、context 成本低。優先序：**DESIGN.md 契約永遠最大**，pro-max 是選型時的查詢來源、hallmark 是產出時的反 slop 關卡，查詢結果不得推翻已定案的契約。這兩個外抓 skill 版本停在安裝當下，`blackcat --update` 刻意不碰它們（不是本 repo 的檔案）——要追新版跑 **`blackcat --ui-refresh`**（舊版先備份再重抓）。
@@ -384,6 +385,9 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.35** | 2026-08-07 | 整理指令定名 `/clean-plan`（`/plans`、`/tidy` 兩個舊名皆自動遷移），職責擴及整個 `.claude/` 工作區（含孤兒 worklog） |
+| **v26.7.33** | 2026-08-07 | 修 skill 不觸發的根因：verification-loop 與 tdd-workflow 的 description 重寫為明確觸發條件（MUST BE USED + 時機/反例），speak-human-tw 擴及技術文件與 README；--usage 補偵測「經 Bash 使用」的 skill（修 graphify 的假陰性）並分離內建項目 |
+| **v26.7.32** | 2026-08-07 | --usage 分離 Claude Code 內建 commands/agents/skills、加判讀指引 |
 | **v26.7.31** | 2026-08-07 | 新增 `blackcat --usage`（--skill-freq）：掃 Claude Code session transcripts 統計 skills/commands/agents 使用次數、列出裝了沒用過的——零常駐成本的回溯分析，供裁汰決策 |
 | **v26.7.30** | 2026-08-07 | 新增 /grill-ui（grill 的前端分支：八項檢查卡 + 同源訪談機制，/go 快車道自動走）；`--ui-refresh` 重抓外部 skills（hallmark/ui-ux-pro-max 追新版，舊版備份） |
 | **v26.7.29** | 2026-07-30 | 實戰修正四項：/go 快車道（trivial 小改跳過 grill/plan/跨 session 審查）；測試品質規則（禁 UI 文案斷言、禁湊覆蓋率，review 會抓）；元件/icon 統一（DESIGN.md 指定唯一 icon 集、複用優先）；UI pack 加裝 ui-ux-pro-max（UX 知識庫層，DESIGN.md 契約優先） |

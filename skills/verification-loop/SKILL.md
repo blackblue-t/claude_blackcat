@@ -1,6 +1,6 @@
 ---
 name: verification-loop
-description: "A comprehensive verification system for Claude Code sessions."
+description: MUST BE USED before declaring any code change complete. Runs the full verification loop -- build, type check, lint, tests, and a diff self-review -- and reports real command output rather than assumptions. Trigger whenever you are about to say a task is done, before committing, or when the user asks "is this working", "verify", "check it". Do not trigger for pure discussion, planning, or reading code.
 origin: ECC
 ---
 
