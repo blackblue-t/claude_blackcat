@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.36**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.37**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -79,14 +79,32 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 **初始化精靈**：專案**第一次**安裝時（模型路由指令剛被複製進去），安裝器會自動跑模型設定精靈——先用 claude CLI 探測 `claude-fable-5` 是否可用（一次極小的 API 呼叫；不可用時 plan/review 預設自動降為 opus），然後逐階段詢問 plan / review / commit / 主迴圈各用哪個模型（Enter 保留預設、可輸入 1-4 或完整模型 ID）。選擇寫進**該專案的**指令副本與 `.claude/settings.json`，所以每個專案可以路由不同。重跑不會再問；想改用 `blackcat --models` 重開精靈。專案自選的模型受更新機制保護：比對時忽略 model 行、更新時保留專案的選擇。
 
-repo 端的預設值集中在這幾個位置，要整批調整（例如未來降級成「規劃 Opus、執行 Sonnet」）改這幾個值再 `blackcat --update` 同步各專案：
+**什麼可以指定模型**（常見誤會：skill 不行）：
 
-| 位置 | 現值 | 管什麼 |
+| 對象 | 能不能指定 | 怎麼設 |
 |:--|:--|:--|
-| `global/settings.json` 的 `"model"` | `opus` | 主迴圈（執行階段） |
-| `commands/plan.md` frontmatter | `claude-fable-5` | /plan 規劃 |
-| `commands/review-code.md` frontmatter | `claude-fable-5` | /review-code 審查 |
-| `commands/commit.md` frontmatter | `sonnet` | /commit 提交 |
+| **Commands**（/plan、/review-code…） | ✅ | 檔案 frontmatter 的 `model:` |
+| **Agents**（ui-builder、code-reviewer…） | ✅ | 同上 |
+| **Skills**（tdd-workflow、worklog…） | ❌ **沒有這個欄位** | 跟著當下執行的模型跑 |
+| 主迴圈 | ✅ | 專案 `.claude/settings.json` → 沒有就用全域 |
+
+**改單一專案**（最常用）：`blackcat --models` 會列出這個專案所有帶模型的指令與現值，輸入編號挑要改的，其餘 Enter 不動：
+
+```
+  Current routing:
+    1) /clean-plan   sonnet          6) /learn        sonnet
+    2) /commit       sonnet          7) /merge        sonnet
+    3) /dispatch     sonnet          8) /plan         claude-fable-5
+    4) /grill-doc    claude-fable-5  9) /review-code  claude-fable-5
+    5) /grill        claude-fable-5 10) main loop     (inherits global)
+  Change which? (numbers separated by spaces, Enter = keep all): 8 10
+```
+
+也可以直接編輯專案裡的 `.claude/commands/<指令>.md`，改第一行 `model:` 即可——**專案自選的模型受更新機制保護**，`blackcat --update` 會保留不覆蓋。
+
+**改所有未來專案**：改 repo 端的預設值再 `blackcat --update` 同步——`global/settings.json` 的 `"model"`（主迴圈，現為 `opus`）、各 `commands/*.md` 的 frontmatter、各 `agents/*.md` 的 frontmatter。
+
+**臨時換**：session 裡打 `/model` 換整個 session 的主迴圈模型（不影響指令自己的路由）。
 
 執行 → 審查 → 提交靠 **worklog 接力**：執行時 worklog skill 把每個變更（動了哪些檔、做了什麼、驗證結果）追加到專案的 `.claude/worklog.md`；`/review-code` **只讀 worklog + 列出檔案的 git diff**（不掃全專案，Fable 的錢花在刀口上），結論寫回 worklog；`verdict: pass` 後 `/commit` 用 Sonnet 只 stage 紀錄過的檔案、寫 commit message、提交並歸檔 worklog。worklog skill 與 `/commit` 已加入 lean/strict 兩個 preset。
 
@@ -387,6 +405,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.37** | 2026-08-07 | 模型精靈改為列出**所有**帶 `model:` 的指令現值供挑選（原本只管 3 個）；修 sed 誤改檔案內範例 model 行的 bug；README 說明 skill 無模型欄位 |
 | **v26.7.36** | 2026-08-07 | 新增 `/grill-doc <檔案>`：對既有文件逐條拷問並**邊談邊就地改寫**（一題一改、能自查的不問人、未決入清單、只改文件不碰程式碼、未受版控先問過才動） |
 | **v26.7.35** | 2026-08-07 | 整理指令定名 `/clean-plan`（`/plans`、`/tidy` 兩個舊名皆自動遷移），職責擴及整個 `.claude/` 工作區（含孤兒 worklog） |
 | **v26.7.33** | 2026-08-07 | 修 skill 不觸發的根因：verification-loop 與 tdd-workflow 的 description 重寫為明確觸發條件（MUST BE USED + 時機/反例），speak-human-tw 擴及技術文件與 README；--usage 補偵測「經 Bash 使用」的 skill（修 graphify 的假陰性）並分離內建項目 |

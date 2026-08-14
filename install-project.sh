@@ -397,67 +397,114 @@ model_from_choice() { # $1=answer $2=default
     esac
 }
 
+cmd_model() { # $1=command basename -> current model, empty if none
+    local f="$DEST/commands/$1.md"
+    [ -f "$f" ] || return 0
+    awk '/^---$/{n++; next} n==1 && /^model:[[:space:]]/{sub(/^model:[[:space:]]*/,""); print; exit}' "$f"
+}
+
 set_cmd_model() { # $1=command basename $2=model
     local f="$DEST/commands/$1.md"
     [ -f "$f" ] || return 0
-    if grep -q '^model: ' "$f"; then
-        sed -i "s/^model: .*/model: $2/" "$f"
+    if [ -n "$(cmd_model "$1")" ]; then
+        # Only the FIRST model: line (frontmatter). Files like plan.md also
+        # contain a model: line inside an example block that must not change.
+        sed -i "0,/^model:[[:space:]].*/s//model: $2/" "$f"
         echo "  [model] commands/$1 -> $2"
     else
         echo "  [note] commands/$1.md has no model: line -- edit it manually"
     fi
 }
 
+set_main_model() { # $1=model
+    local sf="$DEST/settings.json"
+    if [ ! -f "$sf" ]; then
+        printf '{\n  "model": "%s"\n}\n' "$1" > "$sf"
+        echo "  [model] settings.json (created) -> $1"
+    elif grep -q '"model"' "$sf"; then
+        sed -i "s/\"model\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"model\": \"$1\"/" "$sf"
+        echo "  [model] settings.json -> $1"
+    else
+        echo "  [note] settings.json has no model key -- add \"model\": \"$1\" manually"
+    fi
+}
+
 if [ "$UPDATE_ONLY" != true ] && [ -t 0 ] && { [ "$MODEL_PICK" = true ] || [ "$FORCE_MODELS" = true ]; }; then
     echo ""
-    echo "[models] Per-stage model routing for this project."
-    printf "  Probing claude-fable-5 availability (one tiny API call via claude CLI)... "
-    if probe_fable; then
-        FABLE_ST="available"
-    elif [ $? -eq 2 ]; then
-        FABLE_ST="unknown (claude CLI not found; cannot verify)"
-    else
-        FABLE_ST="NOT available"
-    fi
-    echo "$FABLE_ST"
-    DEF_PLAN="claude-fable-5"
-    DEF_REVIEW="claude-fable-5"
-    DEF_COMMIT="sonnet"
-    if [ "$FABLE_ST" = "NOT available" ]; then
-        DEF_PLAN="opus"
-        DEF_REVIEW="opus"
-        echo "  Falling back: plan/review defaults changed to opus."
-    fi
-    echo "  Choices: 1=claude-fable-5  2=opus  3=sonnet  4=haiku"
-    echo "  (Enter keeps the default; you can also type a full model id)"
-    printf "  plan    - /plan strategic planning     [default: %s]: " "$DEF_PLAN"
-    read -r a || a=""
-    M_PLAN="$(model_from_choice "$a" "$DEF_PLAN")"
-    printf "  review  - /review-code code review     [default: %s]: " "$DEF_REVIEW"
-    read -r a || a=""
-    M_REVIEW="$(model_from_choice "$a" "$DEF_REVIEW")"
-    printf "  commit  - /commit mechanical finish    [default: %s]: " "$DEF_COMMIT"
-    read -r a || a=""
-    M_COMMIT="$(model_from_choice "$a" "$DEF_COMMIT")"
-    printf "  execute - main-loop model              [Enter=keep global setting]: "
-    read -r a || a=""
-    M_EXEC="$(model_from_choice "$a" "")"
+    echo "[models] Model routing for this project."
+    echo "         (skills have no model of their own -- they run on whatever"
+    echo "          model is active; only commands and agents can be routed)"
 
-    set_cmd_model plan "$M_PLAN"
-    set_cmd_model review-code "$M_REVIEW"
-    set_cmd_model commit "$M_COMMIT"
-    if [ -n "$M_EXEC" ]; then
-        SET_FILE="$DEST/settings.json"
-        if [ ! -f "$SET_FILE" ]; then
-            printf '{\n  "model": "%s"\n}\n' "$M_EXEC" > "$SET_FILE"
-            echo "  [model] settings.json (created) -> $M_EXEC"
-        elif grep -q '"model"' "$SET_FILE"; then
-            sed -i "s/\"model\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"model\": \"$M_EXEC\"/" "$SET_FILE"
-            echo "  [model] settings.json -> $M_EXEC"
+    # Every installed command that carries a model: line, in file order.
+    MC_NAMES=""
+    for f in "$DEST"/commands/*.md; do
+        [ -f "$f" ] || continue
+        n="$(basename "$f" .md)"
+        [ -n "$(cmd_model "$n")" ] && MC_NAMES="$MC_NAMES $n"
+    done
+
+    # Probe Fable only if something is actually routed to it.
+    NEEDS_FABLE=false
+    for n in $MC_NAMES; do
+        case "$(cmd_model "$n")" in *fable*) NEEDS_FABLE=true ;; esac
+    done
+    if [ "$NEEDS_FABLE" = true ]; then
+        printf "  Probing claude-fable-5 (one tiny API call via claude CLI)... "
+        if probe_fable; then
+            echo "available"
+        elif [ $? -eq 2 ]; then
+            echo "unknown (claude CLI not found)"
         else
-            echo "  [note] settings.json exists without a model key -- add \"model\": \"$M_EXEC\" manually"
+            echo "NOT available"
+            printf "  Downgrade every claude-fable-5 route to opus? [Y/n] "
+            read -r a || a=""
+            case "$a" in
+                n|N|no|NO) ;;
+                *) for n in $MC_NAMES; do
+                       case "$(cmd_model "$n")" in *fable*) set_cmd_model "$n" opus ;; esac
+                   done ;;
+            esac
         fi
     fi
+
+    echo ""
+    echo "  Current routing:"
+    i=1; MC_OPTS=""
+    for n in $MC_NAMES; do
+        printf "   %2d) /%-12s %s\n" "$i" "$n" "$(cmd_model "$n")"
+        MC_OPTS="$MC_OPTS $i:$n"
+        i=$((i+1))
+    done
+    MAIN_CUR="$(grep -o '"model"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEST/settings.json" 2>/dev/null | sed 's/.*"\([^"]*\)"$/\1/')"
+    [ -n "$MAIN_CUR" ] || MAIN_CUR="(inherits global setting)"
+    printf "   %2d) %-13s %s\n" "$i" "main loop" "$MAIN_CUR"
+    MAIN_IDX=$i
+
+    printf "  Change which? (numbers separated by spaces, Enter = keep all): "
+    read -r sel || sel=""
+    if [ -n "$sel" ]; then
+        echo "  Choices: 1=claude-fable-5  2=opus  3=sonnet  4=haiku"
+        echo "  (Enter keeps current; or type a full model id)"
+        for num in $sel; do
+            if [ "$num" = "$MAIN_IDX" ]; then
+                printf "    main loop [current: %s]: " "$MAIN_CUR"
+                read -r a || a=""
+                nm="$(model_from_choice "$a" "")"
+                [ -n "$nm" ] && set_main_model "$nm"
+                continue
+            fi
+            for pair in $MC_OPTS; do
+                if [ "${pair%%:*}" = "$num" ]; then
+                    cn="${pair#*:}"
+                    printf "    /%s [current: %s]: " "$cn" "$(cmd_model "$cn")"
+                    read -r a || a=""
+                    nm="$(model_from_choice "$a" "")"
+                    [ -n "$nm" ] && set_cmd_model "$cn" "$nm"
+                fi
+            done
+        done
+    fi
+    echo "  (re-open this any time with: blackcat --models)"
 fi
 
 # ---------------------------------------------------------------- rules ----
@@ -822,12 +869,13 @@ do_update() {
         rm -rf "$dst"
         cp -r "$src" "$dst"
     else
-        # Preserve the project's chosen frontmatter model across updates.
+        # Preserve the project's chosen frontmatter model across updates
+        # (first model: line only -- some files carry example blocks too).
         local keep_model=""
-        [ -f "$dst" ] && keep_model="$(grep -m1 '^model: ' "$dst" || true)"
+        [ -f "$dst" ] && keep_model="$(awk '/^---$/{n++; next} n==1 && /^model:[[:space:]]/{print; exit}' "$dst")"
         cp "$src" "$dst"
-        if [ -n "$keep_model" ] && grep -q '^model: ' "$dst"; then
-            sed -i "s/^model: .*/$keep_model/" "$dst"
+        if [ -n "$keep_model" ] && grep -q '^model:[[:space:]]' "$dst"; then
+            sed -i "0,/^model:[[:space:]].*/s//$keep_model/" "$dst"
         fi
     fi
     echo "  [update] $1"
