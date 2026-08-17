@@ -1,8 +1,25 @@
 ---
-description: 對當前程式碼庫狀態執行全面驗證檢查。
+description: 機器檢查：跑建置、型別、lint、測試，回報紅綠。純執行指令看結果，不讀程式碼、不做判斷。想要「有沒有壞掉」的答案就跑這個。
+model: sonnet
 ---
+<!-- 模型路由：跑指令看輸出是機械活，sonnet 就夠。判斷性的審查交給
+     /review-code（Fable）。 -->
 
-# 驗證指令
+# 機器檢查（/verify）
+
+**跟 `/review-code` 的分工**（兩者常被搞混）：
+
+| | `/verify`（本指令） | `/review-code` |
+|:--|:--|:--|
+| 做什麼 | **跑指令**：build / type / lint / test | **讀程式碼**：diff 逐行看 |
+| 找什麼 | 工具會報的錯（編譯失敗、測試紅） | 工具報不出的錯（邏輯漏洞、安全、爛測試） |
+| 答案 | PASS / FAIL | verdict: pass / needs-fix + findings |
+| 模型 | sonnet（便宜） | Fable（貴） |
+| 何時 | 隨時想確認沒壞掉 | 一段工作完成、要提交之前 |
+
+一句話：**verify 問「跑得起來嗎」，review-code 問「寫得對嗎」。**
+`/review-code` 會先自己跑一次本指令的檢查當作門檻——建置都紅了不值得
+花錢審查。
 
 ## 說明
 
@@ -52,9 +69,11 @@ Ready for PR: [YES/NO]
 
 如有任何關鍵問題，列出並附修復建議。
 
-## 計畫歸檔
+## 邊界
 
-結果為 PASS 且 `.claude/plans/` 有 `status: active` 且所有階段已勾完的計畫 → 把該計畫的 `status` 改為 `done`、更新 `updated`，然後**整包移到 `.claude/plans/archive/`**——計畫本體 + 同 slug 的 `*-requirements.md`、`*-spec.md` 一起搬，不留孤兒（目錄不存在就建）。FAIL 則不動計畫狀態。目錄堆太多雜檔時建議跑 `/clean-plan` 總整理。
+- **只跑指令、只回報結果**——不改程式碼、不修測試、不做程式碼判斷。
+  發現問題就列出來，修不修由使用者或後續流程決定。
+- 計畫歸檔不是本指令的事（那是 `/commit` 與 `/clean-plan` 的職責）。
 
 ## 參數
 

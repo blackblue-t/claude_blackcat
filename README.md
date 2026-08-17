@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.7.37**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.7.38**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -167,6 +167,8 @@ user check：git log 確認、push 由你決定 → /dispatch --clean 收 worktr
 ```
 
 **前端專案**另有三部曲（初始化時選裝或 `blackcat --ui` 隨時加）：`/ui-style`（問答定風格 → DESIGN.md tokens，**品牌色優先**——給 hex 就生成整套色階、語意 tokens、深色版與 WCAG 對比檢查）→ `/ui-site`（IA 契約 + 路由 stubs）→ `/ui-page <路徑>`（單頁深化，委派 ui-builder agent，附風格合規自檢）。裝 UI pack 時會自動抓兩個 skill 進專案 `.claude/skills/`，分工明確：[Hallmark](https://github.com/nutlope/hallmark)（MIT）是**視覺個性層**——20 種主題 + 57 道 slop-test 檢查關，專殺紫漸層和模板臉，另有 `audit`／`study`；[ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 是 **UX 知識庫層**——可查詢的設計資料庫（50+ 風格、97 色盤、57 字體配對、99 條 UX 準則、a11y 檢查），用腳本查詢、context 成本低。優先序：**DESIGN.md 契約永遠最大**，pro-max 是選型時的查詢來源、hallmark 是產出時的反 slop 關卡，查詢結果不得推翻已定案的契約。這兩個外抓 skill 版本停在安裝當下，`blackcat --update` 刻意不碰它們（不是本 repo 的檔案）——要追新版跑 **`blackcat --ui-refresh`**（舊版先備份再重抓）。
+
+**`/verify` vs `/review-code`**（最容易搞混的一對）：verify 問「**跑得起來嗎**」——跑 build/type/lint/test 看紅綠，機械活、用 sonnet、隨時可跑；review-code 問「**寫得對嗎**」——讀 diff 找工具報不出的錯（邏輯漏洞、安全、爛測試），用 Fable、一段工作完成才跑。兩者是**門檻與判斷**的關係：`/review-code` 第 0 步會自己先跑機器檢查，**紅的就停下不審**（建置壞掉的程式碼不值得花貴模型逐行看）。所以你平常不必特地跑 `/verify`，它是給「我只想知道現在有沒有壞」的時刻用的。
 
 **拷問三兄弟**：`/grill`（從零問出需求）、**`/grill-doc <檔案>`**（拿你現成的需求書/規格來拷問——逐條追問模糊、矛盾、缺口，**每談定一題就直接改進文件裡**，不是最後才生一份新的；能自己查證的先查不問你，未決的進文件末尾的清單）、`/grill-ui`（前端小改的八項檢查卡）。三者同一套訪談機制：一次一題、附建議答案、能自答的不打擾你。
 
@@ -405,6 +407,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.7.38** | 2026-08-07 | 切清 `/verify` 與 `/review-code` 的邊界：verify 定位為純機器檢查（改 sonnet、拿掉計畫歸檔兼差），review-code 第 0 步先跑機器檢查當門檻、紅了不審不燒貴模型 |
 | **v26.7.37** | 2026-08-07 | 模型精靈改為列出**所有**帶 `model:` 的指令現值供挑選（原本只管 3 個）；修 sed 誤改檔案內範例 model 行的 bug；README 說明 skill 無模型欄位 |
 | **v26.7.36** | 2026-08-07 | 新增 `/grill-doc <檔案>`：對既有文件逐條拷問並**邊談邊就地改寫**（一題一改、能自查的不問人、未決入清單、只改文件不碰程式碼、未受版控先問過才動） |
 | **v26.7.35** | 2026-08-07 | 整理指令定名 `/clean-plan`（`/plans`、`/tidy` 兩個舊名皆自動遷移），職責擴及整個 `.claude/` 工作區（含孤兒 worklog） |

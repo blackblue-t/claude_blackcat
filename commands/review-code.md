@@ -11,7 +11,20 @@ model: claude-fable-5
 （worklog skill）已把動過的檔案與意圖記在 `.claude/worklog.md`，
 審查只需要「紀錄 + 這些檔案的 diff」。
 
+**跟 `/verify` 的分工**：verify 問「跑得起來嗎」（跑指令看紅綠），
+本指令問「寫得對嗎」（讀 diff 找工具報不出的錯）。所以下面第 0 步
+先把 verify 的檢查當門檻跑一次。
+
 ## 流程
+
+### 0. 機器檢查門檻（先跑，紅了就別審）
+
+跑專案的 build / type / lint / test（等同 `/verify` 的檢查）。
+
+- **紅的** → 停下，回報失敗內容，**不進入審查**——建置壞掉的程式碼
+  不值得花貴模型逐行看，先修好再回來。
+- **綠的** → 記下結果（審查結論裡要附），進入下一步。
+- 剛剛才跑過 `/verify` 且之後沒有新變更 → 直接沿用那次結果，不重跑。
 
 ### 1. 決定審查範圍
 
@@ -57,6 +70,7 @@ model: claude-fable-5
 ```markdown
 ## Review (round N)
 - verdict: pass          # 或 needs-fix / escalate
+- checks: build/type/lint/test 全綠   # 第 0 步的結果
 - scope: <審查了哪些檔案>
 - findings:
   - [fix] <檔案:行> <問題與建議>       # pass 且無發現時寫 none

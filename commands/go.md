@@ -60,6 +60,9 @@ description: 一條龍指令：需求 → 計畫（唯一人工關卡）→ 執�
 - **一般任務** → 主 session 直接實作；strict preset（裝了
   tdd-workflow）就照 TDD 紀律走。全程遵守 worklog 紀律。
 
+實作告一段落先跑 `/verify` 的機器檢查（build/type/lint/test）——紅的
+就地修完再進審查，不要把壞掉的東西送去審。
+
 ### 3. 自動跨 session 審查（不用使用者開視窗）
 
 執行告一段落後，**用 headless session 跑審查**（新 context = 獨立
