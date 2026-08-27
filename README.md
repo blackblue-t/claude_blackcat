@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.8.1**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.8.2**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -180,6 +180,8 @@ user check：git log 確認、push 由你決定 → /dispatch --clean 收 worktr
 /session who                  :: 看目前誰在做什麼（過期登記會標示）
 /session free                 :: 做完了，把自己的登記清掉
 ```
+
+**`/clear` 不會忘**：第一次登記角色時會接一個 SessionStart hook（`/clear` 後也觸發、每 session 只跑一次，不違反零常駐原則）——自動把看板灌回 context，session 記得誰是 owner、誰是 reviewer。身分認領靠 branch 比對或看板上的 `label:` 短代號，判不出來就問你一次；也可手動 `/session`（不帶參數）找回身分。
 
 搭配 `session-etiquette` skill：其他 session 動手改檔案前會先看看板——落在別人 `files:` 範圍內的**先協調才動**（有訊息工具就直接發，沒有就停下來問你），範圍外照做但登記一行，只讀不寫永遠不用問。`/session own` 還會問要不要在 CLAUDE.md 加一行硬接線（skill 觸發是機率性的，CLAUDE.md 每個 session 必載入才擋得住）。
 
@@ -424,6 +426,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.8.2** | 2026-08-08 | 修 /clear 失憶：登記角色時自動接 SessionStart hook 把看板灌回 context（clear 後也觸發）；看板加 label 短代號、`/session` 不帶參數找回身分（branch 比對，判不出問一次） |
 | **v26.8.1** | 2026-08-08 | 多 session 分工：`/session own\|review\|who\|free` 檔案看板 + `session-etiquette` skill（改別人負責的檔案前先協調）；以檔案為主因跨 session 訊息不支援原生 Windows |
 | **v26.7.38** | 2026-08-07 | 切清 `/verify` 與 `/review-code` 的邊界：verify 定位為純機器檢查（改 sonnet、拿掉計畫歸檔兼差），review-code 第 0 步先跑機器檢查當門檻、紅了不審不燒貴模型 |
 | **v26.7.37** | 2026-08-07 | 模型精靈改為列出**所有**帶 `model:` 的指令現值供挑選（原本只管 3 個）；修 sed 誤改檔案內範例 model 行的 bug；README 說明 skill 無模型欄位 |
