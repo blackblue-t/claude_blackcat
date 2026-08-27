@@ -12,7 +12,13 @@ model: sonnet
 看板檔在哪個平台都能用；有訊息工具時再拿來即時通知。
 
 用法：`/session own 我負責主線開發` / `/session review` /
-`/session who` / `/session free` / `/session`（不帶參數 = 找回身分）。
+`/session who` / `/session free` / `/session ask-review`（叫審查）/
+`/session`（不帶參數 = 找回身分）。
+
+**who: 欄位怎麼填**：有 `ListAgents` 工具（macOS/Linux/WSL2）→ 先查出
+**自己的真實 session 名稱**（如 `cathay-etl-java-22`）記進去——這樣
+別的 session 才能用 SendMessage 指名找它。沒有（原生 Windows）→ 記
+使用者取的 label，並註明 `(no messaging)`。
 
 ## own — 宣告主責
 
@@ -89,6 +95,29 @@ model: sonnet
 ## free — 釋放角色
 
 把自己的段落從看板移除（只移除自己那段，不動別人的），回報現況。
+
+## ask-review —— 叫審查站跑 /review-code
+
+owner 做完一段工作要送審時用。兩條路，自動選：
+
+1. **有 SendMessage 且看板 reviewer 記了真實 session 名** →
+   對它發訊息：「請跑 /review-code（範圍照 worklog），結論照規矩
+   寫回 worklog 的 Review 條目」。**完成訊號走檔案**：對方把
+   verdict 寫進 worklog，你收到回覆或稍後讀 worklog 就知道結果——
+   檔案接力在任何平台都成立。
+2. **沒有 SendMessage（原生 Windows）或 reviewer 不在線** →
+   headless 開一次性審查 session：
+   `claude -p "/review-code" --dangerously-skip-permissions`
+   跑完讀 worklog 取 verdict。
+
+兩條路的後續相同：pass → 提醒 /commit；needs-fix → 照修復迴圈。
+
+**關於「審完要 clear」**：/clear 是客戶端指令，模型不能自己按、
+也不能遠端叫別的 session 按——這是平台限制，不要承諾做得到。
+- 路線 2（headless）**天然免 clear**：每次都是全新 context，跑完即丟。
+  這也正是審查獨立性的來源，預設建議走這條。
+- 路線 1（持久 reviewer session）想清 context 只能由使用者自己按
+  /clear；按完也不怕失憶——SessionStart hook 會把看板灌回去。
 
 ## 不帶參數 —— 找回身分（/clear 之後用）
 
