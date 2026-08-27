@@ -60,10 +60,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # worklog + commit are in both presets: they carry the model-routing relay
 # (plan on Fable -> execute on the session model writing .claude/worklog.md
 # -> review-code on Fable reads only that scope -> commit on sonnet).
-LEAN_SKILLS="ponytail ponytail-review worklog"
-LEAN_COMMANDS="go grill grill-ui grill-doc plan clean-plan dispatch merge review-code commit learn save-session"
-STRICT_SKILLS="tdd-workflow verification-loop worklog"
-STRICT_COMMANDS="go grill grill-ui grill-doc plan clean-plan spec dispatch merge tdd verify review-code commit learn save-session"
+LEAN_SKILLS="ponytail ponytail-review worklog session-etiquette"
+LEAN_COMMANDS="go grill grill-ui grill-doc plan clean-plan dispatch merge review-code commit learn save-session session"
+STRICT_SKILLS="tdd-workflow verification-loop worklog session-etiquette"
+STRICT_COMMANDS="go grill grill-ui grill-doc plan clean-plan spec dispatch merge tdd verify review-code commit learn save-session session"
 
 # Items renamed in this repo: "<old> <new>" pairs. When the new one installs,
 # the stale old copy is moved to backups so projects do not keep both.
