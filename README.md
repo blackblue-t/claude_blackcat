@@ -1,11 +1,11 @@
 # claude_blackcat
 
-**版本：v26.8.3**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.9.1**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
 ```
-全域（~/.claude/）：settings + statusline + cat 指令        ← 偏好，跟人走
+全域（~/.claude/）：settings + statusline + 註記寫法 + cat 指令 ← 偏好，跟人走
 專案（.claude/）  ：1-4 個 skills + 3-5 個 commands         ← 工作流，跟專案走
 產出（.claude/）  ：plans/ + sessions/                      ← 記憶，跟專案進 git
 ```
@@ -32,7 +32,7 @@ cd claude_blackcat
 bash install.sh     # 建立 blackcat 指令；把 ~/.claude/bin 加進 PATH
 ```
 
-安裝前會**先清後裝**：把舊版本 repo 裝進 `~/.claude` 的項目（agents、commands、output-styles、rules、hooks、repo 提供的 skills——不論 symlink 或複製的實體目錄）備份到 `~/.claude/backups/<時間戳>/` 後移除。**不會動到**：credentials、projects/、settings.local.json、`.mcp.json`、CLAUDE.md、非本 repo 的 skills（如 ECC 裝的）。安裝腳本輸出全為英文（cmd 對 UTF-8 中文的解析有已知 bug）。
+安裝前會**先清後裝**：把舊版本 repo 裝進 `~/.claude` 的項目（agents、commands、output-styles、rules、hooks、repo 提供的 skills——不論 symlink 或複製的實體目錄）備份到 `~/.claude/backups/<時間戳>/` 後移除。**不會動到**：credentials、projects/、settings.local.json、`.mcp.json`、非本 repo 的 skills（如 ECC 裝的）。全域 CLAUDE.md 只會在尾端加一段帶標記的 import（載入註記寫法），原有內容不動，重跑不重複。安裝腳本輸出全為英文（cmd 對 UTF-8 中文的解析有已知 bug）。
 
 安裝後手動設定：`settings.local.json`（API keys）、`.mcp.json`（每台機器不同）。**不需要安裝 ECC plugin**。
 
@@ -370,6 +370,8 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 ## 全域層細節
 
+**註記寫法**（`global/notes-style.md`）：規定 Claude 寫程式碼註解、commit message、worklog、PR 說明、專案文件時不用 emoji 與裝飾符號、結論先寫、不寫套話、寫具體的檔名與數字。做成全域規則而不是 skill：skill 靠模型判斷要不要觸發，實測會漏（tdd-workflow 曾在 /tdd 跑 19 次時觸發 0 次），而註記規矩必須每次都生效，所以透過全域 CLAUDE.md import 載入，每個 session、每個專案都套用。要調整寫法直接改這個檔案，重跑 `install.bat` 生效。
+
 **Statusline**：多行彩色（模型 │ context │ 目錄+branch │ 時長 │ 花費 + rate limit 進度條）——把「現在燒多快」常駐在眼前，才會記得省。需要 `jq`，install.sh 會檢查。
 
 **Hooks**：v26.7.3 起全域**零 hooks**。agent-monitor 移至 project-template（`--taskmaster` 時隨專案安裝）；舊版 25+ 個 ECC hooks 已於 v26.7.1 移除。回滾看 git history。
@@ -429,6 +431,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.9.1** | 2026-09-30 | 新增全域註記寫法規則（不用 emoji、結論先寫、不寫套話、寫具體內容），經全域 CLAUDE.md 帶標記 import 載入，所有專案生效 |
 | **v26.8.3** | 2026-08-08 | 看板 who: 改記真實 session 名稱（有 ListAgents 時）；新增 /session ask-review：有訊息工具指名 reviewer 跑審、否則 headless 一次性審查（天然免 clear）；明確記載 /clear 無法由模型或遠端執行 |
 | **v26.8.2** | 2026-08-08 | 修 /clear 失憶：登記角色時自動接 SessionStart hook 把看板灌回 context（clear 後也觸發）；看板加 label 短代號、`/session` 不帶參數找回身分（branch 比對，判不出問一次） |
 | **v26.8.1** | 2026-08-08 | 多 session 分工：`/session own\|review\|who\|free` 檔案看板 + `session-etiquette` skill（改別人負責的檔案前先協調）；以檔案為主因跨 session 訊息不支援原生 Windows |
