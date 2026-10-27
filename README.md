@@ -1,11 +1,11 @@
 # claude_blackcat
 
-**版本：v26.9.1**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.10.1**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
 ```
-全域（~/.claude/）：settings + statusline + 註記寫法 + cat 指令 ← 偏好，跟人走
+全域（~/.claude/）：settings + statusline + 註記寫法 + UI 風格庫 + cat 指令 ← 偏好，跟人走
 專案（.claude/）  ：1-4 個 skills + 3-5 個 commands         ← 工作流，跟專案走
 產出（.claude/）  ：plans/ + sessions/                      ← 記憶，跟專案進 git
 ```
@@ -48,6 +48,8 @@ blackcat --strict     :: 正式產品工作流
 blackcat --writing    :: 疊加寫作組合（可配任一 preset）
 blackcat --rules python  :: 直接指定編碼規範（common 全部 + 指定語言，不經選單）
 blackcat --no-rules   :: 跳過規範選單（CI / 腳本用；非互動環境本來就會自動跳過）
+blackcat --ui         :: 加裝前端包（風格庫選風格、/ui-style /ui-site /ui-page、截圖驗收）
+blackcat --pm         :: 加裝專案管理包（WBS、/task-next、自動時間紀錄、套件管理器選擇）
 blackcat --taskmaster :: 加裝 TaskMaster
 blackcat --update     :: 純更新模式：blackcat repo 更新後，刷新專案裡已裝且有變動的項目
 blackcat --usage      :: 用量統計：這個專案的 skills/commands/agents 各用過幾次、哪些裝了沒用過（別名 --skill-freq）
@@ -63,13 +65,15 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 | Preset | 適用 | Skills | Commands |
 |:--|:--|:--|:--|
-| `--lean`（預設） | side project、原型、快速迭代 | ponytail、ponytail-review | /plan /review-code /save-session |
-| `--strict` | 正式產品、多人協作 | tdd-workflow、verification-loop | /plan /tdd /verify /review-code /save-session |
+| `--lean`（預設） | side project、原型、快速迭代 | ponytail、ponytail-review、worklog、session-etiquette | /go /grill /grill-ui /grill-doc /plan /clean-plan /dispatch /merge /review-code /commit /learn /save-session /session |
+| `--strict` | 正式產品、多人協作 | tdd-workflow、verification-loop、worklog、session-etiquette | lean 全部 + /spec /tdd /verify |
 | `--writing`（疊加） | 會產出對外文字的專案 | speak-human-tw、humanizer | — |
 
 > lean 和 strict **刻意互斥**：ponytail 的「測試留最小 check」和 tdd-workflow 的「強制 80% 覆蓋率」觸發條件相同、指令互相矛盾，同裝會讓行為不可預測。要混用請自行 `--skills` 指定。`--writing` 則跟兩者都不衝突（不同場域）。
 >
 > **切換 preset**：直接在專案裡跑另一個 preset 即可——安裝器會偵測衝突並詢問「Switch to strict? [y/N]」，`y` 就把舊 preset 的 skills 移到 `.claude/backups/preset-switch-<時間戳>/` 再裝新的（留下的舊指令檔如 /tdd 無害，只有被呼叫才作用）。非互動環境只警告不動手。
+
+兩個 preset 都會裝**坑閘門**（`.claude/hooks/pitfall-gate.sh`，PreToolUse hook）：`/learn` 把跟特定檔案有關的教訓寫成 `.claude/learned/*.md`（frontmatter `files:` 填檔案樣式），之後 Claude 要改到那些檔案時，hook 擋下一次並把教訓貼給它看，重試就放行。沒有教訓檔時 hook 讀都不讀 stdin 就結束（約 2ms）。要暫停：環境變數 `PITFALL_GATE=off`。
 
 裝完把專案的 `.claude/` 提交進該專案的 git。
 
@@ -166,7 +170,14 @@ user check：git log 確認、push 由你決定 → /dispatch --clean 收 worktr
      `.claude/` 堆亂了跑 /clean-plan：完成的計畫/任務整包歸檔、爛尾的問你續作或棄置
 ```
 
-**前端專案**另有三部曲（初始化時選裝或 `blackcat --ui` 隨時加）：`/ui-style`（問答定風格 → DESIGN.md tokens，**品牌色優先**——給 hex 就生成整套色階、語意 tokens、深色版與 WCAG 對比檢查）→ `/ui-site`（IA 契約 + 路由 stubs）→ `/ui-page <路徑>`（單頁深化，委派 ui-builder agent，附風格合規自檢）。裝 UI pack 時會自動抓兩個 skill 進專案 `.claude/skills/`，分工明確：[Hallmark](https://github.com/nutlope/hallmark)（MIT）是**視覺個性層**——20 種主題 + 57 道 slop-test 檢查關，專殺紫漸層和模板臉，另有 `audit`／`study`；[ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 是 **UX 知識庫層**——可查詢的設計資料庫（50+ 風格、97 色盤、57 字體配對、99 條 UX 準則、a11y 檢查），用腳本查詢、context 成本低。優先序：**DESIGN.md 契約永遠最大**，pro-max 是選型時的查詢來源、hallmark 是產出時的反 slop 關卡，查詢結果不得推翻已定案的契約。這兩個外抓 skill 版本停在安裝當下，`blackcat --update` 刻意不碰它們（不是本 repo 的檔案）——要追新版跑 **`blackcat --ui-refresh`**（舊版先備份再重抓）。
+**前端專案**另有三部曲（初始化時選裝或 `blackcat --ui` 隨時加）：
+
+- `/ui-style`：從 **104 種風格庫**（`~/.claude/ui-library/`，全域裝一次）挑風格——看三個方向的配色與版面預覽挑一個、自己挑單一品牌、混搭（配色/字體/元件/版面各取一家）、**貼網址抽風格**（firecrawl 或 Playwright 讀色票字型，不搬 logo 與文案）、或照專案現有樣式反推。再問品牌色（給 hex 生成色階、深色版、WCAG 對比檢查）、icon 集、元件策略、網站類型與動畫等級（L1 安靜／L2 有節奏／L3 沉浸）。產出 `.claude/ui/DESIGN.md`（唯一風格契約）與 `.claude/ui/style.json`。
+- `/ui-site`：IA 契約＋路由 stubs，可選灰框可點原型。
+- `/ui-page <路徑>`：單頁深化，委派 ui-builder agent。ui-builder 產出後**截圖驗收**：Playwright MCP 截 390 與 1440 兩個寬度並自己看圖、768/1024 查水平捲軸、讀 console 錯誤；沒有 MCP 就用 Playwright CLI 退路；截不到圖一律回 `DONE_WITH_CONCERNS`，不准當作通過。
+- 規範集中在 `ui-style-compliance` skill（寫碼前載入確認、色彩/字體/間距禁令、產出後自檢清單的唯一來源），附三份按需讀的檔：`anti-ai.md`（反 AI 感清單、不准編造價格評論等事實）、`motion.md`（動畫分級、降級與瀏覽器支援度）、`fonts-cjk.md`（繁中字型堆疊、日系風格換繁中字型對照）。
+
+風格庫與 ui-style-compliance 移植自同事的 [claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw)（MIT），風格檔上游見「參考來源」。風格庫是**參考風格，不是品牌授權**：產出的介面不放對方 logo、品牌名與招牌文案。裝 UI 包時另外抓 [Hallmark](https://github.com/nutlope/hallmark) 與 [ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 當額外參考，跟 DESIGN.md 或 anti-ai.md 衝突時以後兩者為準；這兩個外抓 skill 不受 `--update` 管，追新版跑 `blackcat --ui-refresh`。
 
 **`/verify` vs `/review-code`**（最容易搞混的一對）：verify 問「**跑得起來嗎**」——跑 build/type/lint/test 看紅綠，機械活、用 sonnet、隨時可跑；review-code 問「**寫得對嗎**」——讀 diff 找工具報不出的錯（邏輯漏洞、安全、爛測試），用 Fable、一段工作完成才跑。兩者是**門檻與判斷**的關係：`/review-code` 第 0 步會自己先跑機器檢查，**紅的就停下不審**（建置壞掉的程式碼不值得花貴模型逐行看）。所以你平常不必特地跑 `/verify`，它是給「我只想知道現在有沒有壞」的時刻用的。
 
@@ -196,9 +207,22 @@ user check：git log 確認、push 由你決定 → /dispatch --clean 收 worktr
 
 **小改動不裸奔**：/go 快車道遇到前端改動會自動過 `/grill-ui` 檢查卡——共用元件波及、元件狀態（hover/empty/loading…）、RWD 爆版、深色對應、tokens 合規、文案與測試、a11y 八項。機制與 /grill 同源：能從 codebase/DESIGN.md 自答的自己查證，真正的決策才問你（一次一題附建議答案，通常 ≤3 題）。也可手動單跑：`/grill-ui 把價格卡改三欄`。**Pencil** 兩種裝法：桌面 app（[pencil.dev](https://pencil.dev)，開 `.pen` 檔自動接上 Claude Code，畫布上直接拖拉調整）或 **pen CLI**（`npm install -g @pencil.dev/cli`，Node 18+，`pen login` 認證）——CLI 是 headless 的同款引擎，能跑 agent、呼叫 MCP 工具、**匯出 PNG/JPEG/WEBP/PDF**，沒有 GUI 也能走「AI 畫 → 出圖給你看 → 文字回饋修改 → 迭代到確認」的畫布先行流程；`blackcat --ui` 會偵測 pen CLI 並給安裝指引。MCP 接線細節見 [pen CLI 文件](https://docs.pencil.dev/for-developers/pen-cli)。**動線驗證**（Figma prototype 的替代）：/ui-site 可產出灰框 HTML 原型——頁面連結真的可點、彈窗真的會開，瀏覽器直接走完整個流程。
 
-**MCP 快速設定**：`templates/mcp.json.windows.example` / `mcp.json.linux-macos.example` 複製到專案根改名 `.mcp.json`、刪掉不用的、填 key 即可（機器特定，勿 commit）。
+**MCP 快速設定**：`templates/mcp.json.windows.example` / `mcp.json.linux-macos.example` 複製到專案根改名 `.mcp.json`、刪掉不用的、填 key 即可（機器特定，勿 commit；dispatcher 會照 `.worktreeinclude` 把它複製進 worktree）。範本內每個 server 都附一行用途說明：
 
-**為什麼是 worktree 而不是 sub-agent**：sub-agent 的產出全部回堆到主 session 的 context，任務一多就炸，而且每個 sub-agent 要重新讀一遍專案背景。worktree + headless session 是**完全獨立的 context**——互不污染、各自省流，程式碼隔離在各自分支，最後才合併。
+| Server | 用途 | 需要 key |
+|:--|:--|:--|
+| github | PR、issue、程式碼搜尋 | 是 |
+| playwright | 真瀏覽器：UI 截圖驗收、貼網址抽風格、e2e | 否 |
+| context7 | 查函式庫當前版本文件，避免用到舊 API | 選用 |
+| brave-search | 網頁搜尋（Brave 官方套件，Node 22+） | 是（有免費額度） |
+| firecrawl | 網頁轉乾淨 markdown、抽品牌色票字型 | 是 |
+| pencil | `.pen` 畫布設計稿；桌面 app 會自動接，沒出現才手動加，路徑要對照自己電腦 | 否 |
+| sequential-thinking | 給模型一個「逐步寫下思考、可回頭修正」的工具。現在的模型有內建延伸思考，效益小 | 否 |
+| memory | 本機知識圖譜（實體＋關係存在 JSON 檔），跨 session 記事。跟 CLAUDE.md、/learn、learned/ 重疊 | 否 |
+
+**為什麼是 worktree + headless session 而不是 sub-agent**：sub-agent 的結果回到主 session 的 context，任務一多就塞滿；Claude Code 原生的 worktree sub-agent 雖然檔案也隔離，但生命週期綁在主 session 上，主 session 中斷或 compact 就跟著受影響。headless session 是**完全獨立的行程**——各自的 context、各自的分支，主 session 關掉也照跑，最後才合併。
+
+**派工前自動處理兩件事**：未 commit 的任務檔先在整合分支上 commit（worktree 只看得到已 commit 的檔案）；`.gitignore` 掉的必要檔（預設 `.env .env.local .mcp.json .claude/settings.local.json`）照專案根的 `.worktreeinclude` 複製進每個 worktree，`--clean` 時一起刪。**任務回報碼**：每個任務收尾寫 `result: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED`，`--status` 照碼顯示，`--merge` 跳過 NEEDS_CONTEXT 與 BLOCKED。
 
 **dispatcher 用法**——兩個入口，同一個引擎（`dispatch.sh`）：
 
@@ -218,6 +242,8 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 - **`skip`（預設）**= `--dangerously-skip-permissions`，worktree 內全自動。端到端實測的結論：`acceptEdits` 會擋掉驗證指令、`git commit` 和 `.claude/` 寫入，誠實的 agent 全數卡死在 pending、dispatcher 永不返回。真正的安全閘門在流程裡——任務檔案範圍鐵則、review gate、永不 push——不在權限模式。
 - `acceptEdits`：只給不信任的場景,並預期任務會卡住,除非專案 permissions 放行驗證指令。
+
+**審查核心改用 Claude Code 內建 `/code-review`**：`/review-code` 只當外殼——先跑機器檢查、從 worklog 決定範圍、呼叫內建審查（第一輪 high、重審 medium），再自己補四項內建不查的：驗證缺口、測試品質、**規格收斂**（對照需求文件找漏做、範圍蔓延、描述失真）、**文件債**（改了介面卻沒更新文件，列為 `[fix]`）。內建審查不存在時退回自審。
 
 **審查修復迴圈**（needs-fix 之後）：審查者（Fable）給每個 finding 標級——`fix`（不動介面/資料格式/依賴/需求 → **主 session 修**,修的人與審的人分離）、`design`（回 /plan）、`requirement`（回 /grill）；有高層級 finding 整輪不修小的。修完做**限縮重審**（只看 finding + Fix 條目 + 修復 diff）,上限 2 輪,過不了就升級給使用者裁決。修復由 `/commit` 在整合分支上先行提交再合併回 main。
 
@@ -239,6 +265,23 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 - 裝完在 Claude Code 裡跑一次 `/graphify .` 建圖（產出 `graph.json` / `GRAPH_REPORT.md` / `graph.html`）。之後圖靠 git hook 在每次 commit 自動增量更新；沒裝 hook 的話手動 `graphify update .`。
 - 它建立的 `.claude/skills/graphify` 歸 graphify CLI 管——blackcat 的清理與更新機制**刻意不碰**非本 repo 的 skills，互不干擾。
+
+### 專案管理：`--pm`
+
+```
+/task-init   收斂需求（不做什麼、最大風險、回述確認）→ 拆 WBS（里程碑、任務、依賴、預估）
+/task-next   選下一個依賴都完成、優先最高的任務 → 標進行中、開始計時 → 交給 /go 或 /plan
+             --parallel 找一批互相獨立的任務 → 匯出任務檔 → /dispatch
+/task-add    中途冒出的需求加進 WBS（會先比對重複、檢查是否在「不做」清單）
+/task-status 進度、預估對實際、照目前速度會不會趕不上目標日；里程碑完成時提議歸檔
+/time-log    按日、按任務的實際時間與費用
+/pm-choose   選套件管理器（Node：pnpm/bun/npm；Python：uv/poetry/pip）
+```
+
+- WBS 存在 `.claude/taskmaster-data/wbs.md`（進 git），格式與更新規則集中在 `wbs` skill。
+- **跟現有流程接起來**：`/plan` 的計畫檔與任務檔帶 `wbs: <編號>`；`/commit` 提交後自動把那一列改「完成」；`/go` 有 WBS 時會先對應到某一列，對不到就問要不要先加。
+- **時間紀錄不用打卡**：全域狀態列在專案有 `.claude/taskmaster-data/` 時，每次更新寫一份 `sessions/<session>-<段>.json`；同一個 session 中途換任務會開新的一段，時間不會算錯任務。記的是牆上時間（含你在看的時間）。這個資料夾預設不進 git。
+- **套件管理器**：選定後寫 `.claude/package-manager.json`，`package-manager` skill 規定之後所有安裝、執行、測試都照它；多個 lock 檔並存、設定與 lock 檔不符時停下來問，不自己刪。UI 包也會裝這兩樣（截圖驗收要啟動 dev server）。
 
 ### 更新機制
 
@@ -278,7 +321,7 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 ---
 
-## Skills 詳解（22 個）
+## Skills 詳解（28 個）
 
 ### 常駐哲學（lean preset）
 
@@ -296,7 +339,28 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 兩者依語言自動分工：中文找 speak-human-tw，英文找 humanizer，不會打架。
 
-### 工作流（strict preset）
+### 工作流（兩個 preset 都有）
+
+| Skill | 觸發 | 功能 |
+|:--|:--|:--|
+| **worklog** | 改檔案時 | 每段改動記在 `.claude/worklog.md`（並行任務寫 `worklog.d/<slug>.md`，最後一行是回報碼），審查只看這個範圍 |
+| **session-etiquette** | 動手改檔前 | 看 `/session` 看板，別人負責的檔案先協調 |
+
+### 前端包（`--ui`）與專案管理包（`--pm`）
+
+| Skill | 觸發 | 功能 |
+|:--|:--|:--|
+| **ui-style-compliance** | 寫任何前端程式碼、跑 /ui-site /ui-page、呼叫 pencil 前 | 載入 DESIGN.md 並陳述關鍵規範、硬編碼禁令、產出後自檢與斷點規則的唯一來源；附 anti-ai.md、motion.md、fonts-cjk.md |
+| **package-manager** | 跑任何 npm/pnpm/bun/uv/pip 指令、動 lock 檔前 | 照 `.claude/package-manager.json` 用對應指令，lock 檔衝突停下來問 |
+| **wbs** | 寫或改 WBS 前 | WBS 版面、欄位、狀態轉換、現況重算、歸檔規則的唯一來源 |
+
+### 維護用（`--skills writing-extensions` 選裝）
+
+| Skill | 觸發 | 功能 |
+|:--|:--|:--|
+| **writing-extensions** | 要新增 hook、skill、command、agent 或 CLAUDE.md 規則時 | 決策表：該放哪一層（判斷得出時機的用 hook）、skill description 怎麼寫才會被想起來、怎麼驗證真的生效 |
+
+### 品質紀律（strict preset）
 
 | Skill | 觸發 | 功能 |
 |:--|:--|:--|
@@ -317,7 +381,7 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 ---
 
-## Commands 詳解（13 個）
+## Commands 詳解（29 個）
 
 ### 核心五個（presets 內含）
 
@@ -329,14 +393,24 @@ bcd --clean         # 移除 worktree、刪已合併分支
 | `/review-code` | 正確性導向的程式碼審查（品質、安全、架構）；跟 `/ponytail-review` 互補 |
 | `/save-session` | session 存檔（見上） |
 
-### TaskMaster 系（`--taskmaster` 時）
+### 流程站（presets 內含，說明見上方各節）
+
+`/go` `/grill` `/grill-ui` `/grill-doc` `/spec` `/clean-plan` `/dispatch` `/merge` `/commit` `/learn` `/session`
+
+### 前端包（`--ui`）
+
+`/ui-style` `/ui-site` `/ui-page` `/pm-choose`
+
+### 專案管理包（`--pm`）
 
 | 指令 | 用法 |
 |:--|:--|
-| `/task-init` | 專案初始化，建 WBS 任務清單 |
-| `/task-next` | 取下一個優先任務 |
-| `/task-status` | 看 WBS 進度與時間追蹤 |
-| `/time-log` | 開發時間記錄 |
+| `/task-init` | 收斂需求後拆 WBS |
+| `/task-add` | 追加任務或里程碑 |
+| `/task-next` | 取下一個任務並開始計時；`--parallel` 找一批可並行的 |
+| `/task-status` | 進度、預估對實際、目標日風險、歸檔 |
+| `/time-log` | 按日、按任務的時間與費用 |
+| `/pm-choose` | 選或切換套件管理器 |
 
 ### 其他（手動 `--commands` 選裝）
 
@@ -349,22 +423,21 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 ---
 
-## Agents（17）與 Output Styles（15）
+## Agents（18）與 Output Styles（17）
 
 皆為選裝庫，預設 preset **不裝**（與 skills 同概念重疊，遵守「同一概念只留一層」）。真的需要再 `--agents` / `--output-styles` 指定：
 
-- **Agents**：planner、architect、tdd-guide、code-reviewer、security-reviewer、build-error-resolver、e2e-runner、refactor-cleaner、doc-updater、docs-lookup、database-reviewer、python/typescript/rust-reviewer、rust/pytorch-build-resolver、chief-of-staff
-- **Output Styles**：PRD、BDD、架構、DDD、API 契約、TDD 規格、審查清單、安全清單、DB Schema、Python 實作、前端 BDD、整合契約、資料契約、CI 門檻、Vision（適合要產出規格文件的場合）
+- **Agents**：planner、architect、tdd-guide、code-reviewer、security-reviewer、build-error-resolver、e2e-runner、refactor-cleaner、doc-updater、docs-lookup、database-reviewer、python-reviewer、typescript-reviewer、rust-reviewer、rust-build-resolver、pytorch-build-resolver、chief-of-staff、ui-builder（`--ui` 自動裝）
+- **Output Styles（回覆方式）**：`terse`（趕工用，只給結果和下一步）、`plain-language`（先白話講結論與影響，術語第一次出現附一句白話）。裝進專案後在 Claude Code 用 `/output-style` 切換
+- **Output Styles（文件模板）**：01-prd-product-spec、02-bdd-scenario-spec、03-architecture-design-doc、04-ddd-aggregate-spec、05-api-contract-spec、06-tdd-unit-spec、07-code-review-checklist、08-security-checklist、09-database-schema-spec、10-backend-python-impl、11-frontend-component-bdd、12-integration-contract-suite、13-data-contract-evolution、14-ci-quality-gates、15-Vision-output（適合要產出規格文件的場合）
+
+**維護這個 repo**：新增或刪除 skill、command、agent、output style、風格後跑 `bash scripts/check-counts.sh`，它會檢查 README 的計數、安裝器 preset 名單是否都存在、有沒有項目 README 沒提到、風格庫目錄是否一致、安裝腳本是否純 ASCII。
 
 ---
 
-## TaskMaster 工作流（選裝）
+## TaskMaster 工作流（舊版選裝）
 
-```
-/task-init → /task-next → /plan → /tdd → /verify → /task-next（循環）
-```
-
-`--taskmaster` 安裝 project-template 的 hooks（session-start / user-prompt-submit / agent-monitor / pre-tool-use / post-write）、coordination（人機協作配置）與專案 settings.json。適合需要 WBS 級任務管理的大專案；小專案用核心工作流就夠。
+`--taskmaster` 安裝 project-template 的 hooks（session-start / user-prompt-submit / agent-monitor / pre-tool-use / post-write）、coordination（人機協作配置）與專案 settings.json。WBS 與時間紀錄現在由 `--pm` 負責（不需要任何 hook），新專案用 `--pm` 即可。
 
 ---
 
@@ -372,9 +445,11 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 **註記寫法**（`global/notes-style.md`）：規定 Claude 寫程式碼註解、commit message、worklog、PR 說明、專案文件時不用 emoji 與裝飾符號、結論先寫、不寫套話、寫具體的檔名與數字。做成全域規則而不是 skill：skill 靠模型判斷要不要觸發，實測會漏（tdd-workflow 曾在 /tdd 跑 19 次時觸發 0 次），而註記規矩必須每次都生效，所以透過全域 CLAUDE.md import 載入，每個 session、每個專案都套用。要調整寫法直接改這個檔案，重跑 `install.bat` 生效。
 
-**Statusline**：多行彩色（模型 │ context │ 目錄+branch │ 時長 │ 花費 + rate limit 進度條）——把「現在燒多快」常駐在眼前，才會記得省。需要 `jq`，install.sh 會檢查。
+**Statusline**：多行彩色（模型 │ context │ 目錄+branch │ 時長 │ 花費 + rate limit 進度條）——把「現在燒多快」常駐在眼前，才會記得省。需要 `jq`，install.sh 會檢查。專案有 `.claude/taskmaster-data/` 時順便寫時間紀錄（見「專案管理」）。
 
-**Hooks**：v26.7.3 起全域**零 hooks**。agent-monitor 移至 project-template（`--taskmaster` 時隨專案安裝）；舊版 25+ 個 ECC hooks 已於 v26.7.1 移除。回滾看 git history。
+**UI 風格庫**（`~/.claude/ui-library/`）：104 種設計系統（每種一份 DESIGN.md＋SOURCE.json 記來源與授權），`CATALOG.md` 是繁中目錄。全域一份，`/ui-style` 只把選中的組進專案。
+
+**Hooks**：v26.7.3 起全域**零 hooks**；專案層只有 preset 附的坑閘門（有教訓檔才有作用）與 `/session` 登記時加的看板 hook。agent-monitor 移至 project-template（`--taskmaster` 時隨專案安裝）；舊版 25+ 個 ECC hooks 已於 v26.7.1 移除。回滾看 git history。
 
 **Rules**：24 個編碼規範文件（common 9 + python/typescript/rust 各 5）。注意 **Claude Code 不會自動載入 rules 目錄**——安裝器會把規範複製進專案 `.claude/rules/` 並在專案 CLAUDE.md 附加一段帶標記的 `@import` 區塊（原生 memory import 機制），這才是規範真正進入 startup prompt 的接線。重跑不會重複附加；每個 import 的檔案都吃 context，按專案需要選裝。
 
@@ -415,7 +490,8 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 - [mattpocock/skills](https://github.com/mattpocock/skills)
 - [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)（MIT，已收錄）
-- [bheadwei/claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw)
+- [bheadwei/claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw)（MIT © 2024 Claude Code Universal Template，授權全文見 `THIRD_PARTY_NOTICES.md`；ui-style-compliance、風格庫目錄、ui-builder 截圖驗收、WBS 格式、套件管理器規則、output styles、擴充決策表移植自此，已改寫為本 repo 路徑）
+- UI 風格庫上游（皆 MIT，授權原文在 `ui-library/_licenses/`，每個風格的來源在 `SOURCE.json`）：[VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md)、awesome-design-md-jp、oh-my-design；`self-extracted` 標記的 11 種由 GUNDAM 作者自行整理
 - [ultraworkers/claw-code](https://github.com/ultraworkers/claw-code)
 - [nutlope/hallmark](https://github.com/nutlope/hallmark)（MIT，`--ui` 時抓進專案）
 - [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)（`--ui` 時抓進專案）
@@ -431,6 +507,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.10.1** | 2026-10-27 | 對照 GUNDAM v5.5 補強：dispatcher 修兩個 bug（未 commit 的任務檔自動 commit、`.worktreeinclude` 複製 .env 等忽略檔）；任務回報碼；/review-code 核心改用內建 /code-review，加規格收斂與文件債檢查；坑閘門 hook＋learned/；UI 搬入 104 種風格庫（全域）、ui-style-compliance、截圖驗收、/ui-style 改風格庫選擇＋貼網址抽風格；新增 `--pm` 專案管理包（WBS、/task-add、自動分段時間紀錄、/pm-choose）；output styles terse／plain-language；writing-extensions 決策表；scripts/check-counts.sh；MCP 範本加 brave-search、firecrawl、pencil 並附用途說明 |
 | **v26.9.1** | 2026-09-30 | 新增全域註記寫法規則（不用 emoji、結論先寫、不寫套話、寫具體內容），經全域 CLAUDE.md 帶標記 import 載入，所有專案生效 |
 | **v26.8.3** | 2026-08-08 | 看板 who: 改記真實 session 名稱（有 ListAgents 時）；新增 /session ask-review：有訊息工具指名 reviewer 跑審、否則 headless 一次性審查（天然免 clear）；明確記載 /clear 無法由模型或遠端執行 |
 | **v26.8.2** | 2026-08-08 | 修 /clear 失憶：登記角色時自動接 SessionStart hook 把看板灌回 context（clear 後也觸發）；看板加 label 短代號、`/session` 不帶參數找回身分（branch 比對，判不出問一次） |

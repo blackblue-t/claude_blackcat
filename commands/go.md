@@ -31,6 +31,12 @@ description: 一條龍指令：需求 → 計畫（唯一人工關卡）→ 執�
 檢查卡過程中發現其實會動到邏輯/資料 → 轉 standard。其餘 = standard，
 從 0.1 走起。
 
+### 0.05 WBS 對應（有 `.claude/taskmaster-data/wbs.md` 時）
+
+需求對應到 WBS 某一列 → 照 `wbs` skill 改 `進行中`、寫 `.current-task`，計畫帶 `wbs:`。
+對不到 → 問一句「要先加進 WBS 嗎？」（`/task-add`），使用者說不用就照做、不記任務。
+快車道的小改不用問。
+
 ### 0.1 需求把關（視情況）
 
 - 使用者**指定了一份既有文件**（需求書、規格）→ 照 `grill-doc.md`

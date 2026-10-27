@@ -1,27 +1,98 @@
 {
-  "_readme": "Copy to your project root as .mcp.json, delete servers you do not use, fill in keys. Windows wraps npx with cmd /c. .mcp.json is machine-specific -- do NOT commit it.",
-  "_pencil_note": "Frontend canvas-first flow: npm install -g @pencil.dev/cli (Node 18+), then 'pen login'. The desktop app wires its MCP automatically; for CLI-based MCP wiring copy the exact entry from https://docs.pencil.dev/for-developers/pen-cli into this file.",
+  "_readme": "Copy to your project root as .mcp.json, delete servers you do not use, fill in keys. Windows wraps npx with cmd /c. .mcp.json holds keys and machine paths -- do NOT commit it (dispatcher copies it into worktrees via .worktreeinclude).",
+  "_servers": {
+    "github": "PRs, issues, code search. Needs a personal access token.",
+    "playwright": "Real browser: ui-builder screenshot checks, /ui-style URL extraction, e2e.",
+    "context7": "Current library docs, so code does not use outdated APIs. Key optional (higher rate limit).",
+    "brave-search": "Web search via Brave API (free tier available at brave.com/search/api). Official package, Node 22+.",
+    "firecrawl": "Scrape a page to clean markdown, or extract branding (colors/fonts) for /ui-style path H. Needs a firecrawl.dev key.",
+    "pencil": "Canvas-first UI design (.pen files). The Pencil desktop app wires its MCP automatically; add this entry only when it does not show up. Check the binary path on your machine.",
+    "sequential-thinking": "Gives the model a scratchpad tool to write numbered thinking steps and revise them. Little gain on current models with built-in extended thinking; keep only if you like seeing the steps.",
+    "memory": "A local knowledge graph (entities + relations) stored in a JSON file that survives across sessions. Overlaps with CLAUDE.md, /learn and .claude/learned/; keep only if you want ad-hoc facts remembered outside the repo."
+  },
   "mcpServers": {
     "github": {
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-github"],
-      "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_YOUR_TOKEN_HERE" }
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_YOUR_TOKEN_HERE"
+      }
     },
     "playwright": {
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@playwright/mcp@latest"]
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@playwright/mcp@latest"
+      ]
     },
     "context7": {
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@upstash/context7-mcp"]
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
+      "env": {
+        "CONTEXT7_API_KEY": "OPTIONAL_CONTEXT7_KEY"
+      }
+    },
+    "brave-search": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@brave/brave-search-mcp-server"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "YOUR_BRAVE_API_KEY"
+      }
+    },
+    "firecrawl": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "firecrawl-mcp"
+      ],
+      "env": {
+        "FIRECRAWL_API_KEY": "fc-YOUR_FIRECRAWL_KEY"
+      }
+    },
+    "pencil": {
+      "type": "stdio",
+      "command": "${USERPROFILE}\\.pencil\\mcp\\cursor\\out\\mcp-server-windows-x64.exe",
+      "args": [
+        "--app",
+        "cursor"
+      ]
     },
     "sequential-thinking": {
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
     },
     "memory": {
       "command": "cmd",
-      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-memory"]
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ]
     }
   }
 }

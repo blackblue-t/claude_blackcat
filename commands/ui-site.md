@@ -9,8 +9,9 @@ stub。之後 `/ui-page` 深化單頁時照 IA 做,不用重問基本問題。
 
 ## 流程
 
-1. **前置**：讀 `.claude/ui/DESIGN.md`（沒有先跑 /ui-style）。
-2. **問答**（一次一題）：網站目的與受眾 → 需要哪些頁面（給常見組合
+1. **前置**：讀 `.claude/ui/DESIGN.md`（沒有先跑 /ui-style）與 `.claude/ui/style.json`。
+2. **問答**（一次一題）：網站類型（`style.json` 已有 `site_type` 就直接帶入不問；要問時
+   選項照 `/ui-style` 步驟 2 的表，答案寫回 `style.json`）→ 網站目的與受眾 → 需要哪些頁面（給常見組合
    multi-select：行銷站 = Home/Pricing/About/Contact；SaaS = 上述 +
    Login/Dashboard/Settings…）→ 每頁的主要 CTA → 共用元素
    （Header/Footer/Sidebar）→ 資料來源（靜態 / API / CMS）。
@@ -29,6 +30,11 @@ stub。之後 `/ui-page` 深化單頁時照 IA 做,不用重問基本問題。
 6. 提醒：逐頁跑 `/ui-page <路徑>` 深化。
    pencil MCP 可用時,IA 也可以先畫成 .pen 設計稿讓使用者在畫布上
    視覺調整,確認後再產 stubs。
+
+## 自檢
+
+stub 與共用元件也要過 `ui-style-compliance` 階段 3 的清單（唯一來源）；stub 沒有視覺內容
+的項目寫「不適用」，不要勾。灰框原型不用過自檢。
 
 ## 鐵則
 

@@ -115,6 +115,15 @@ branch_done() { # non-empty commits on task branch beyond base
     [ -n "$(git -C "$PROJ" log --oneline "$BASE_BRANCH..$1" 2>/dev/null)" ]
 }
 
+# Each task session ends by writing "result: <CODE> -- <reason>" to its
+# worklog. Read it from the worktree (present even when the session could
+# not commit). Codes: DONE, DONE_WITH_CONCERNS, NEEDS_CONTEXT, BLOCKED.
+task_result() { # $1=slug -> "CODE -- reason", empty if not reported
+    local f="$WT_ROOT/$1/.claude/worklog.d/$1.md"
+    [ -f "$f" ] || return 0
+    grep -m1 '^result:' "$f" | sed 's/^result:[[:space:]]*//'
+}
+
 # ---------------------------------------------------------------- status ----
 if [ "$MODE" = "status" ]; then
     echo "[status] base branch: $BASE_BRANCH / configured max: $MAX_PARALLEL (conf/default)"
@@ -131,6 +140,8 @@ if [ "$MODE" = "status" ]; then
         extra=""
         branch_done "$branch" && extra=" (branch has commits)"
         [ -d "$WT_ROOT/$slug" ] && extra="$extra [worktree active]"
+        res="$(task_result "$slug")"
+        [ -n "$res" ] && extra="$extra result: $res"
         echo "  $slug: $st$extra"
     done
     exit 0
@@ -145,6 +156,11 @@ if [ "$MODE" = "merge" ]; then
         slug="$(basename "$t" .md)"
         branch="$(task_meta "$t" branch)"; [ -n "$branch" ] || branch="task/$slug"
         branch_done "$branch" || { echo "  [skip] $slug (no commits on $branch)"; continue; }
+        case "$(task_result "$slug")" in
+            NEEDS_CONTEXT*|BLOCKED*)
+                echo "  [skip] $slug (reported $(task_result "$slug" | cut -d' ' -f1); partial work is not merged)"
+                continue ;;
+        esac
         echo "  [merge] $branch"
         if ! git -C "$PROJ" merge --no-ff --no-edit "$branch"; then
             echo ""
@@ -228,6 +244,73 @@ if [ "$NEED_INT" = true ]; then
     BASE_BRANCH="$INT_BRANCH"
 fi
 
+# A worktree is a checkout of BASE_BRANCH, so a task file that was never
+# committed does not exist inside it and the session cannot read its task.
+# Copying it in is not enough: the task branch would then add the file, and
+# merging back fails because the same path is untracked in this checkout.
+# So commit uncommitted task files here (on the integration branch when we
+# started from main), touching nothing else the user has staged.
+IGNORED_TASKS=false
+UNCOMMITTED=""
+for t in $TASKS; do
+    rel=".claude/tasks/$(basename "$t")"
+    if git -C "$PROJ" check-ignore -q "$rel" 2>/dev/null; then
+        IGNORED_TASKS=true
+        continue
+    fi
+    [ -n "$(git -C "$PROJ" status --porcelain -- "$rel")" ] && UNCOMMITTED="$UNCOMMITTED $rel"
+done
+if [ -n "$UNCOMMITTED" ]; then
+    # shellcheck disable=SC2086
+    git -C "$PROJ" add -- $UNCOMMITTED \
+        && git -C "$PROJ" commit -q -m "chore: commit task files for dispatch" -- $UNCOMMITTED \
+        || { echo "[error] could not commit task files:$UNCOMMITTED"; exit 1; }
+    echo "[tasks] committed $(echo $UNCOMMITTED | wc -w) task file(s) on $BASE_BRANCH so worktrees can read them"
+fi
+if [ "$IGNORED_TASKS" = true ]; then
+    echo "[tasks] WARNING: .claude/tasks is gitignored -- task files will be copied into"
+    echo "        each worktree, but their status: done will not merge back."
+fi
+
+# Gitignored files (.env, .mcp.json) never appear in a fresh checkout, so a
+# task that needs them fails. Honor .worktreeinclude (same file and rule
+# Claude Code uses natively: copy files that match a pattern AND are
+# gitignored); without one, fall back to the common minimum.
+WT_INCLUDE_PATS=""
+if [ -f "$PROJ/.worktreeinclude" ]; then
+    WT_INCLUDE_PATS="$(sed -e 's/[[:space:]]*#.*$//' -e '/^[[:space:]]*$/d' "$PROJ/.worktreeinclude")"
+else
+    WT_INCLUDE_PATS=".env
+.env.local
+.mcp.json
+.claude/settings.local.json"
+fi
+IGNORED_FILES="$(git -C "$PROJ" ls-files --others --ignored --exclude-standard --directory 2>/dev/null)"
+
+copy_worktree_includes() { # $1=worktree path -> prints copied paths
+    local wt="$1" f pat base copied=""
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        case "$f" in */) continue ;; esac   # collapsed ignored dirs (node_modules/)
+        base="${f##*/}"
+        while IFS= read -r pat; do
+            [ -n "$pat" ] || continue
+            case "$pat" in
+                */*) case "$f" in $pat) ;; *) continue ;; esac ;;
+                *)   case "$base" in $pat) ;; *) continue ;; esac ;;
+            esac
+            mkdir -p "$wt/$(dirname "$f")"
+            cp "$PROJ/$f" "$wt/$f" && copied="$copied $f"
+            break
+        done <<EOF_PATS
+$WT_INCLUDE_PATS
+EOF_PATS
+    done <<EOF_FILES
+$IGNORED_FILES
+EOF_FILES
+    echo "$copied"
+}
+
 if [ "$DISPATCH_PERMISSIONS" = "skip" ]; then
     PERM_FLAGS="--dangerously-skip-permissions"
     echo "[perm] skip: sessions run fully autonomous inside their worktrees"
@@ -260,7 +343,13 @@ Rules:
 2. Record your work in .claude/worklog.d/$1.md (sections: files / did / why / verify), creating the directory if needed.
 3. Run the verification steps listed in the task and record real results.
 4. Change 'status: pending' to 'status: done' in .claude/tasks/$1.md when (and only when) verification passes.
-5. git add your changed files and git commit on this branch with a conventional message. Do NOT push. Do NOT merge. Do NOT switch branches."
+5. git add your changed files and git commit on this branch with a conventional message. Do NOT push. Do NOT merge. Do NOT switch branches.
+6. Your LAST action: add one line to .claude/worklog.d/$1.md, exactly 'result: <CODE> -- <one-sentence reason>', CODE being one of:
+   DONE                 task complete, verification passed
+   DONE_WITH_CONCERNS   complete and verified, but something deserves a reviewer's attention (say what)
+   NEEDS_CONTEXT        cannot finish without information the task file does not give (say what is missing)
+   BLOCKED              cannot proceed: environment, permission, or tool failure (say what failed)
+   Never claim DONE if verification did not actually pass. Write this line even if you could not commit."
 }
 
 spawn_window() { # $1=title $2=runner script path
@@ -303,6 +392,12 @@ launch_task() { # $1=task file
             || git -C "$PROJ" worktree add "$wt" "$branch" >/dev/null 2>&1 \
             || { echo "  [error] $slug: cannot create worktree"; touch "$LOG_DIR/$slug.done"; return 0; }
     fi
+    if [ "$IGNORED_TASKS" = true ]; then
+        mkdir -p "$wt/.claude/tasks" && cp "$t" "$wt/.claude/tasks/"
+    fi
+    local env_copied
+    env_copied="$(copy_worktree_includes "$wt")"
+    [ -n "$env_copied" ] && echo "  [env] $slug: copied$env_copied (control with .worktreeinclude)"
     if [ "$DISPATCH_WINDOW" = 1 ]; then
         echo "  [window] $slug -> $branch (model: $model, title: bc-$slug)"
         task_prompt "$slug" "$branch" > "$LOG_DIR/$slug.prompt"
@@ -354,20 +449,39 @@ wait 2>/dev/null || true
 
 echo ""
 echo "[run] all sessions finished. Results:"
-ok=0; bad=0
+ok=0; warn=0; bad=0
 for t in $TASKS; do
     slug="$(basename "$t" .md)"
     branch="$(task_meta "$t" branch)"; [ -n "$branch" ] || branch="task/$slug"
-    if branch_done "$branch"; then
-        echo "  [done] $slug ($(git -C "$PROJ" log --oneline "$BASE_BRANCH..$branch" | wc -l) commit(s) on $branch)"
-        ok=$((ok+1))
-    else
-        echo "  [FAIL] $slug -- no commits; see .claude/dispatch-logs/$slug.log"
-        bad=$((bad+1))
-    fi
+    res="$(task_result "$slug")"
+    code="${res%% *}"
+    n_commits="$(git -C "$PROJ" log --oneline "$BASE_BRANCH..$branch" 2>/dev/null | wc -l)"
+    case "$code" in
+        DONE)
+            echo "  [done] $slug ($n_commits commit(s) on $branch)"
+            ok=$((ok+1)) ;;
+        DONE_WITH_CONCERNS)
+            echo "  [done, check] $slug -- ${res#* -- }"
+            warn=$((warn+1)) ;;
+        NEEDS_CONTEXT)
+            echo "  [needs context] $slug -- ${res#* -- }"
+            bad=$((bad+1)) ;;
+        BLOCKED)
+            echo "  [blocked] $slug -- ${res#* -- }"
+            bad=$((bad+1)) ;;
+        *)
+            if [ "$n_commits" -gt 0 ]; then
+                echo "  [done, unreported] $slug ($n_commits commit(s); session wrote no result line)"
+                warn=$((warn+1))
+            else
+                echo "  [FAIL] $slug -- no commits, no result; see .claude/dispatch-logs/$slug.log"
+                bad=$((bad+1))
+            fi ;;
+    esac
 done
 echo ""
-echo "[next] $ok done, $bad failed."
+echo "[next] $ok done, $warn need a look, $bad not finished."
+[ "$bad" -gt 0 ] && echo "       Unfinished tasks are skipped by --merge. Fix the task file or environment, set status: pending, re-run."
 echo "       Merge:  blackcat-dispatch --merge"
 echo "       Review: open a FRESH session, run /review-code, then /commit"
 echo "       Clean:  blackcat-dispatch --clean"

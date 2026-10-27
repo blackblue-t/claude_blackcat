@@ -34,6 +34,8 @@ description: MUST BE USED whenever writing or modifying code files in this proje
 如果你正在 dispatcher 派發的獨立 worktree 裡執行單一任務（dispatch 的
 提示詞會明說），紀錄寫到 `.claude/worklog.d/<任務slug>.md` 而不是
 `worklog.md`——每個任務一份檔案，合併分支時才不會衝突。格式相同。
+最後一行固定寫 `result: <代碼> -- <原因>`（DONE / DONE_WITH_CONCERNS /
+NEEDS_CONTEXT / BLOCKED），dispatcher 靠它判斷任務結果、決定要不要合併。
 
 ## 與 /review-code、/commit 的接力
 

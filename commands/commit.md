@@ -50,6 +50,11 @@ staging、commit message、合併回主分支（並行路線）、歸檔——�
    `.claude/tasks/archive/`（strict 專案通常由 /verify 先做掉計畫部分，
    這裡是 lean 專案的補位）。
 
+   **WBS 同步**（有 `.claude/taskmaster-data/wbs.md` 時）：本次歸檔的計畫與任務檔裡有
+   `wbs:` 的，照 `wbs` skill 把那幾列改 `完成 MM-DD`、連結改指 archive 路徑、重算現況區；
+   `.current-task` 是其中一個編號或 `parallel` 且那批都完成了就清空它。計畫還沒全部完成的
+   不改狀態。
+
 5.5 **提交審查修復**（並行路線、有 `## Fix:` 條目時）：只 stage Fix
    條目 `files:` 列出的檔案，在整合分支上 commit（訊息如
    `fix: review round N fixes`）——修復歷史留在整合分支，main 拿到

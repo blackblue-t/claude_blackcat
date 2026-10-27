@@ -122,6 +122,20 @@ install_file "$GLOBAL_SRC/settings.json" "$CLAUDE_DIR/settings.json" "settings.j
 install_file "$GLOBAL_SRC/statusline-command.sh" "$CLAUDE_DIR/statusline-command.sh" "statusline-command.sh"
 install_file "$GLOBAL_SRC/notes-style.md" "$CLAUDE_DIR/notes-style.md" "notes-style.md"
 
+# UI style library (104 reference design systems). One global copy that
+# /ui-style reads from; it copies only the chosen style into a project.
+# Fully managed by this repo, so it is replaced without a backup.
+if [ -d "$SCRIPT_DIR/ui-library" ]; then
+    rm -rf "$CLAUDE_DIR/ui-library"
+    if [ "$MODE" = "symlink" ]; then
+        ln -s "$SCRIPT_DIR/ui-library" "$CLAUDE_DIR/ui-library"
+        echo "  [link] ui-library ($(ls -d "$SCRIPT_DIR"/ui-library/*/ | grep -vc "/_") styles)"
+    else
+        cp -r "$SCRIPT_DIR/ui-library" "$CLAUDE_DIR/ui-library"
+        echo "  [copy] ui-library ($(ls -d "$SCRIPT_DIR"/ui-library/*/ | grep -vc "/_") styles)"
+    fi
+fi
+
 # Rules only reach the model through a CLAUDE.md import, and a skill's
 # auto-trigger is not reliable enough for a rule that applies to every note.
 # Append a marked import block to the global CLAUDE.md; existing content

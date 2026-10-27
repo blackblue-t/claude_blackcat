@@ -58,6 +58,15 @@ model: sonnet
    - 合併衝突：dispatcher 會停下。幫使用者看衝突檔案並提出解法，
      解完 commit 後再跑 `/dispatch --merge` 續行。
 
+## worktree 裡有什麼
+
+- 任務檔：派工前 dispatcher 會把未 commit 的任務檔 commit 到基底分支
+  （從 main 出發時是整合分支，main 不動），worktree 才讀得到。
+- gitignored 檔案（`.env`、`.mcp.json`）：照專案根目錄的 `.worktreeinclude`
+  複製進每個 worktree；沒有這個檔就複製 `.env`、`.env.local`、`.mcp.json`、
+  `.claude/settings.local.json`。這些檔案常含 API key，`--clean` 會連同
+  worktree 一起刪掉，別留著被遺棄的 worktree。
+
 ## 邊界
 
 - 不改任務檔內容（那是 /plan 的產出）；任務不對就回去改計畫重新匯出。

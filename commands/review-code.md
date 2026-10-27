@@ -1,5 +1,5 @@
 ---
-description: 審查 worklog 記錄的變更範圍（不掃全專案），結論寫回 worklog，通過後交給 /commit。
+description: 審查 worklog 記錄的變更範圍（不掃全專案）：逐行審查交給內建 /code-review，另外補查測試品質、規格收斂、文件債，結論寫回 worklog，通過後交給 /commit。
 model: claude-fable-5
 ---
 <!-- 模型路由：審查用 Fable 5。要降級改這裡的 model: 即可，例如 model: opus。
@@ -10,6 +10,9 @@ model: claude-fable-5
 審查範圍**只來自紀錄，不掃全專案**——這是刻意設計：執行階段
 （worklog skill）已把動過的檔案與意圖記在 `.claude/worklog.md`，
 審查只需要「紀錄 + 這些檔案的 diff」。
+
+本指令是外殼：決定範圍、跑門檻、分級、把 verdict 寫回 worklog 讓
+`/commit` 判斷能不能提交。逐行審查交給 Claude Code 內建的 `/code-review`。
 
 **跟 `/verify` 的分工**：verify 問「跑得起來嗎」（跑指令看紅綠），
 本指令問「寫得對嗎」（讀 diff 找工具報不出的錯）。所以下面第 0 步
@@ -39,18 +42,44 @@ model: claude-fable-5
   「沒有可審查的變更」並結束。
 - `$ARGUMENTS` 有給路徑時，把範圍再縮小到該路徑之下。
 
-### 2. 審查
+### 2. 逐行審查：交給內建 /code-review
 
-對範圍內每個檔案：讀 worklog 的 did/why 了解意圖，看 `git diff
-<file>` 的實際變更，必要時才打開整個檔案。檢查：
+用 Skill 工具呼叫 Claude Code 內建的 `code-review`，審查目標設成第 1 步
+決定的範圍：
 
-- **正確性**：變更是否達成 worklog 宣稱的意圖？有沒有邊界條件、錯誤處理漏洞？
-- **安全**：秘密硬編碼、注入、未驗證輸入。
-- **一致性**：命名、風格是否貼合周邊程式碼；有沒有多餘的複雜度。
+- 序列路線（變更還沒提交）：不帶目標，審目前的 diff。
+- 並行路線（已合進整合分支）：目標設成整合分支（branch target），
+  基準是合併前的起點。
+- `$ARGUMENTS` 給了路徑：目標設成那個路徑。
+- 明確指定 effort：第 1 輪 `high`，限縮重審 `medium`。不指定的話它會
+  沿用使用者上次打的等級，結果不可預期。
+- **不要加 `--fix`**：修的人和審的人要分開，修復由主 session 做。
+  也不要加 `--comment`。
+
+內建審查負責正確性、安全、重複程式碼與可簡化之處。它的 findings 帶到
+第 3 步分級。
+
+內建 `code-review` 不存在（Claude Code 版本太舊）時，退回自己逐檔審：
+讀 worklog 的 did/why 了解意圖，看 `git diff <file>`，檢查正確性、安全、
+與周邊程式碼的一致性。
+
+### 2.5 內建審查不管的，自己補查
+
 - **驗證缺口**：worklog 標了 `verify: 未驗證` 的條目，指出該補什麼驗證。
-- **測試品質**：拿 UI 文案當斷言（改文字就紅）、快照全包、為覆蓋率
-  湊數的測試——標 `[fix]`，要求改用 role / data-testid 與行為斷言,
-  或直接刪掉湊數的。
+- **測試品質**：拿 UI 文案當斷言（改文字就紅）、快照全包、為覆蓋率湊數
+  的測試。標 `[fix]`，要求改用 role / data-testid 與行為斷言，或刪掉湊數的。
+- **規格收斂**：`.claude/plans/` 有本次工作的 spec 或 requirements 文件時，
+  拿實作逐條對照，抓三種問題：
+  - 漏做：規格寫了、實作沒有
+  - 範圍蔓延：實作了規格沒寫的功能
+  - 描述失真：規格和實作講的是兩回事
+  前兩種標 `[fix]` 或 `[design]`；描述失真看哪邊對，實作錯標 `[fix]`，
+  規格寫錯標 `[requirement]`。**不要自己改規格文件**，那是使用者的決定。
+- **文件債**：範圍內改到對外介面（API 路由、controller、OpenAPI／proto、
+  資料庫 schema 與 migration、套件公開的 export、CLI 參數），但對應的
+  文件（README、`docs/`、API 文件、CHANGELOG）在這次範圍內沒有一起改
+  → 標 `[fix]`，寫明哪個介面變了、哪份文件該更新。程式改了文件沒跟上，
+  比沒寫文件更糟，因為讀的人會被誤導。
 
 ### 3. 每個 finding 標分級（判斷權在審查者，用清單不用感覺）
 

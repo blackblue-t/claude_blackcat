@@ -45,6 +45,7 @@ status: active        # active → done（/verify 全過後更新）
 current_phase: 1
 files: [會動到的檔案清單]
 updated: <日期>
+wbs: 2.3              # 對應 WBS 任務編號；沒有 WBS 就省略
 ---
 # <計畫標題>
 
@@ -60,6 +61,8 @@ updated: <日期>
 - 確認前**不寫任何檔案**（包含計畫檔本身）
 - `.claude/plans/` 裡有 `*-requirements.md`（/grill 的產出）時先讀它，需求以它為準；
   文件裡有「交接指紋」節時，規劃完成後**回報命中幾項**（驗證交接沒漏）
+- 有 `.claude/taskmaster-data/wbs.md` 時：計畫對應到哪一列就寫 `wbs:`，並照 `wbs` skill
+  把那一列的連結欄補上計畫檔；對不到任何一列 → 問使用者要不要先 `/task-add`
 
 ## 並行任務匯出（供 blackcat-dispatch 使用）
 
@@ -72,6 +75,7 @@ branch: task/<nn>-<slug>
 files: src/auth.py, tests/test_auth.py   # 這個任務允許動的全部檔案
 model: opus                              # 可省略，用 dispatch 預設
 status: pending
+wbs: 2.3                                 # 對應 WBS 任務編號；沒有 WBS 就省略
 ---
 # 任務：<一句話>
 ## 目標與驗收條件
@@ -82,6 +86,10 @@ status: pending
 2. 把工作記錄寫到 `.claude/worklog.d/<slug>.md`（files / did / why / verify）。
 3. 把本檔 `status: pending` 改為 `status: done`。
 4. git add 動過的檔案並 commit（不 push、不 merge、不切分支）。
+5. 最後在 worklog 加一行 `result: <代碼> -- <一句原因>`，代碼四選一：
+   DONE（完成且驗證通過）、DONE_WITH_CONCERNS（完成但有地方要審查者注意）、
+   NEEDS_CONTEXT（任務檔缺資訊做不下去）、BLOCKED（環境或權限問題）。
+   沒能 commit 也要寫這行。
 ```
 
 「完成程序」是任務**內容**的一部分——不依賴 worklog skill 的自覺觸發,
@@ -101,6 +109,8 @@ status: pending
 - 每個任務要**自足**：執行它的 session 沒有任何對話上下文，背景知識要寫進任務檔。
 - 有依賴關係的不要匯出（dispatcher 不解依賴），照 phase 順序在主 session 做。
 - 匯出後提示使用者：`blackcat-dispatch --dry-run` 預覽、`blackcat-dispatch` 執行。
+  任務檔不用手動 commit：dispatcher 派工前會自動 commit 未提交的任務檔
+  （worktree 只看得到已 commit 的檔案）。
 
 ## 重要提醒
 

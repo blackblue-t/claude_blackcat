@@ -16,6 +16,8 @@
 #   bash install-project.sh <project-path> --update     # update-only: refresh installed items that changed in this repo
 #   bash install-project.sh <project-path> --models     # re-open the per-stage model picker
 #   bash install-project.sh <project-path> --graphify   # set up Graphify knowledge graph (token saver, needs graphify CLI)
+#   bash install-project.sh <project-path> --ui         # frontend pack: style library, /ui-style /ui-site /ui-page
+#   bash install-project.sh <project-path> --pm         # project management pack: WBS, time log, package manager
 #   bash install-project.sh --list                      # list available items
 #
 # Updates: installed copies are never silently overwritten. Every run ends
@@ -70,6 +72,11 @@ STRICT_COMMANDS="go grill grill-ui grill-doc plan clean-plan spec dispatch merge
 # (/plans and /tidy -> /clean-plan: explicit name, no near-miss with /plan.)
 RENAMED_COMMANDS="plans:clean-plan tidy:clean-plan"
 WRITING_SKILLS="speak-human-tw humanizer"
+UI_COMMANDS="ui-style ui-site ui-page pm-choose"
+UI_AGENTS="ui-builder"
+UI_SKILLS="ui-style-compliance package-manager"
+PM_COMMANDS="task-init task-add task-next task-status time-log pm-choose"
+PM_SKILLS="wbs package-manager"
 
 list_items() {
     local kind
@@ -86,11 +93,13 @@ list_items() {
     ls "$SCRIPT_DIR/rules" | grep -v 'README' | grep -v '^common$'
     echo ""
     echo "-- extras --"
+    echo "--ui          (frontend pack: $UI_COMMANDS)"
+    echo "--pm          (project management pack: $PM_COMMANDS)"
     echo "--taskmaster  (project-template: TaskMaster hooks + settings + coordination)"
 }
 
 if [ "$1" = "--list" ] || [ -z "$1" ]; then
-    echo "Usage: bash install-project.sh <project-path> [--lean|--strict|--all] [--writing] [--taskmaster] [--rules lang1,lang2 | --no-rules] [--models] [--update] [--skills a,b] [--commands x,y] [--agents m,n] [--output-styles p,q]"
+    echo "Usage: bash install-project.sh <project-path> [--lean|--strict|--all] [--writing] [--ui] [--pm] [--taskmaster] [--rules lang1,lang2 | --no-rules] [--models] [--update] [--skills a,b] [--commands x,y] [--agents m,n] [--output-styles p,q]"
     echo ""
     echo "  --lean     fast-iteration preset: $LEAN_SKILLS (default)"
     echo "  --strict   production preset:     $STRICT_SKILLS"
@@ -121,8 +130,7 @@ UI_REFRESH=false
 USAGE_MODE=false
 PRESET="lean"
 
-UI_COMMANDS="ui-style ui-site ui-page"
-UI_AGENTS="ui-builder"
+PM=false
 SKILLS=""
 COMMANDS=""
 AGENTS=""
@@ -141,6 +149,7 @@ while [ $# -gt 0 ]; do
         --models) FORCE_MODELS=true ;;
         --graphify) GRAPHIFY=true ;;
         --ui) UI=true ;;
+        --pm) PM=true ;;
         --ui-refresh) UI_REFRESH=true ;;
         --usage|--skill-freq) USAGE_MODE=true ;;
         --skills) SKILLS="${2//,/ }"; shift ;;
@@ -341,14 +350,15 @@ done
 
 # Skill directories are copied whole; existing ones are kept untouched
 # (the project may have customized them).
-for s in $SKILLS; do
-    src="$SCRIPT_DIR/skills/$s"
-    if [ ! -d "$src" ]; then echo "  [skip] skills/$s (not found)"; continue; fi
-    if [ -d "$DEST/skills/$s" ]; then echo "  [keep] skills/$s (already exists)"; continue; fi
+install_skill() {
+    local s="$1" src="$SCRIPT_DIR/skills/$1"
+    if [ ! -d "$src" ]; then echo "  [skip] skills/$s (not found)"; return; fi
+    if [ -d "$DEST/skills/$s" ]; then echo "  [keep] skills/$s (already exists)"; return; fi
     mkdir -p "$DEST/skills"
     cp -r "$src" "$DEST/skills/$s"
     echo "  [copy] skills/$s"
-done
+}
+for s in $SKILLS; do install_skill "$s"; done
 
 install_md() {
     local kind="$1" name="$2"
@@ -368,6 +378,49 @@ install_md() {
 for c in $COMMANDS; do install_md commands "$c"; done
 for a in $AGENTS; do install_md agents "$a"; done
 for o in $STYLES; do install_md output-styles "$o"; done
+
+# Add a hook entry to the project's settings.json (idempotent: skipped when
+# the command is already registered). Needs jq to edit JSON safely; without
+# it, print the entry so the user can paste it.
+register_hook() { # $1=event $2=matcher $3=command
+    local sf="$DEST/settings.json"
+    if [ -f "$sf" ] && grep -qF "$(basename "${3%\"}")" "$sf"; then
+        echo "  [keep] $1 hook $(basename "${3%\"}") (already registered)"
+        return 0
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "  [note] jq not found -- add to $sf under hooks.$1 manually:"
+        echo "         {\"matcher\": \"$2\", \"hooks\": [{\"type\": \"command\", \"command\": $(printf '%s' "$3" | sed 's/"/\\"/g; s/^/"/; s/$/"/')}]}"
+        return 0
+    fi
+    [ -f "$sf" ] || echo '{}' > "$sf"
+    local tmp="$sf.tmp.$$"
+    if jq --arg ev "$1" --arg m "$2" --arg c "$3" \
+        '.hooks[$ev] = ((.hooks[$ev] // []) + [{"matcher": $m, "hooks": [{"type": "command", "command": $c, "timeout": 10}]}])' \
+        "$sf" > "$tmp"; then
+        mv "$tmp" "$sf"
+        echo "  [hook] $1 ($2) -> $(basename "${3%\"}")"
+    else
+        rm -f "$tmp"
+        echo "  [error] could not update $sf (invalid JSON?) -- hook not registered"
+    fi
+}
+
+# Pitfall gate: lessons in .claude/learned/ block a write to a matching file
+# once per session. Exits immediately while learned/ holds no lessons.
+if [ "$UPDATE_ONLY" != true ]; then
+    mkdir -p "$DEST/hooks"
+    if [ ! -f "$DEST/hooks/pitfall-gate.sh" ]; then
+        cp "$SCRIPT_DIR/project-hooks/pitfall-gate.sh" "$DEST/hooks/pitfall-gate.sh"
+        echo "  [copy] hooks/pitfall-gate.sh"
+    fi
+    if [ ! -d "$DEST/learned" ]; then
+        mkdir -p "$DEST/learned"
+        cp "$SCRIPT_DIR/templates/learned/README.md" "$SCRIPT_DIR/templates/learned/_TEMPLATE.md" "$DEST/learned/"
+        echo "  [copy] learned/ (README + _TEMPLATE)"
+    fi
+    register_hook PreToolUse "Write|Edit|MultiEdit" 'bash "$CLAUDE_PROJECT_DIR/.claude/hooks/pitfall-gate.sh"'
+fi
 
 # --------------------------------------------------------------- models ----
 # First-install model picker: probe whether claude-fable-5 is usable, then
@@ -424,7 +477,11 @@ set_main_model() { # $1=model
     elif grep -q '"model"' "$sf"; then
         sed -i "s/\"model\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"model\": \"$1\"/" "$sf"
         echo "  [model] settings.json -> $1"
+    elif command -v jq >/dev/null 2>&1 && jq --arg m "$1" '.model = $m' "$sf" > "$sf.tmp.$$"; then
+        mv "$sf.tmp.$$" "$sf"
+        echo "  [model] settings.json -> $1"
     else
+        rm -f "$sf.tmp.$$"
         echo "  [note] settings.json has no model key -- add \"model\": \"$1\" manually"
     fi
 }
@@ -719,6 +776,13 @@ install_ui() {
     echo "[ui] installing frontend pack"
     for c in $UI_COMMANDS; do install_md commands "$c"; done
     for a in $UI_AGENTS; do install_md agents "$a"; done
+    for s in $UI_SKILLS; do install_skill "$s"; done
+    # The style library itself is global (~/.claude/ui-library, installed by
+    # install.sh); /ui-style composes the chosen style into .claude/ui/.
+    if [ ! -f "$HOME/.claude/ui-library/CATALOG.md" ]; then
+        echo "  [note] style library not found at ~/.claude/ui-library"
+        echo "         rerun install.bat / install.sh in the blackcat repo to get it"
+    fi
     # Hallmark (github.com/nutlope/hallmark, MIT): anti-AI-slop design
     # skill -- 20 themes + 57 slop-test gates. Copied into the project
     # (own-and-customize); not a repo skill, so blackcat's update/cleanup
@@ -816,6 +880,33 @@ if [ "$UPDATE_ONLY" != true ]; then
     fi
 fi
 
+# ------------------------------------------------------------------- pm ----
+# Project management pack (opt-in): WBS in .claude/taskmaster-data/wbs.md,
+# /task-next feeds /go and /plan, /commit marks rows done. Time is logged
+# by the global statusline whenever .claude/taskmaster-data/ exists (that
+# folder is created by /task-init), so there is no hook to install.
+install_pm() {
+    echo "[pm] installing project management pack"
+    for c in $PM_COMMANDS; do install_md commands "$c"; done
+    for s in $PM_SKILLS; do install_skill "$s"; done
+    echo "  next: /task-init to build the WBS (time tracking starts after that)"
+}
+
+if [ "$UPDATE_ONLY" != true ]; then
+    if [ "$PM" = true ]; then
+        echo ""
+        install_pm
+    elif [ -t 0 ] && [ "$MODEL_PICK" = true ] && [ ! -f "$DEST/commands/task-init.md" ]; then
+        echo ""
+        printf "[pm] Track this project with a WBS and time log (/task-init /task-next /time-log)? [y/N] "
+        read -r ans || ans=""
+        case "$ans" in
+            y|Y|yes|YES) install_pm ;;
+            *) echo "  (add it later any time with: blackcat --pm)" ;;
+        esac
+    fi
+fi
+
 if [ "$TASKMASTER" = true ]; then
     echo ""
     echo "[taskmaster] installing project-template..."
@@ -862,9 +953,18 @@ for kind in commands agents output-styles; do
             || UPDATE_LIST="$UPDATE_LIST $kind/$name"
     done
 done
+# Project hooks ship from project-hooks/ but live in .claude/hooks/.
+for f in "$DEST"/hooks/*.sh; do
+    [ -f "$f" ] || continue
+    name="$(basename "$f")"
+    src="$SCRIPT_DIR/project-hooks/$name"
+    [ -f "$src" ] || continue
+    cmp -s "$src" "$f" || UPDATE_LIST="$UPDATE_LIST hooks/$name"
+done
 
 do_update() {
     local src="$SCRIPT_DIR/$1" dst="$DEST/$1"
+    case "$1" in hooks/*) src="$SCRIPT_DIR/project-hooks/${1#hooks/}" ;; esac
     if [ -d "$src" ]; then
         rm -rf "$dst"
         cp -r "$src" "$dst"

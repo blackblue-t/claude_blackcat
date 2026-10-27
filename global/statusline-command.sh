@@ -329,22 +329,39 @@ if [ -n "$usage_data" ] && echo "$usage_data" | jq -e . >/dev/null 2>&1; then
     fi
 fi
 
-# ── Persist session duration for time tracking ──────────
-# Write current session's duration to a temp file so session-start can finalize it
+# ── Time tracking (only in projects with .claude/taskmaster-data) ──
+# One record per session per task segment: sessions/<sid>-<n>.json. A new
+# segment starts when .current-task changes, so time lands on the right
+# WBS task. /time-log sums these; nothing else needs to archive them.
 timelog_dir="$cwd/.claude/taskmaster-data"
-if [ -d "$timelog_dir" ] && [ "$total_duration_ms" -gt 0 ] 2>/dev/null; then
-    session_id=$(echo "$input" | jq -r '.session_id // ""')
-    today=$(date '+%Y-%m-%d' 2>/dev/null)
-    start_time=""
-    [ -f "$timelog_dir/.session-start" ] && start_time=$(cat "$timelog_dir/.session-start" 2>/dev/null | head -1)
+session_id=$(echo "$input" | jq -r '.session_id // ""' | tr -cd 'A-Za-z0-9_-')
+if [ -d "$timelog_dir" ] && [ -n "$session_id" ] && [ "$total_duration_ms" -gt 0 ] 2>/dev/null; then
+    sess_dir="$timelog_dir/sessions"
+    mkdir -p "$sess_dir" 2>/dev/null
+    [ -f "$sess_dir/.gitignore" ] || echo '*' > "$sess_dir/.gitignore" 2>/dev/null
     total_cost_raw=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
-    # Read current task if any
     current_task=""
-    [ -f "$timelog_dir/.current-task" ] && current_task=$(cat "$timelog_dir/.current-task" 2>/dev/null | head -1)
-    # Write snapshot (overwrite each time)
-    cat > "$timelog_dir/.session-snapshot" 2>/dev/null <<SNAPSHOT
-{"session_id":"${session_id}","date":"${today}","start":"${start_time}","duration_ms":${total_duration_ms},"cost_usd":${total_cost_raw},"task":"${current_task}"}
-SNAPSHOT
+    [ -f "$timelog_dir/.current-task" ] && current_task=$(head -1 "$timelog_dir/.current-task" 2>/dev/null | tr -d '\r"\\')
+    # state: n|task|base_ms|base_cost|date|start|last_ms|last_cost
+    state="$sess_dir/.$session_id.state"
+    seg_n=0; seg_task=""; seg_ms=0; seg_cost=0; seg_date=""; seg_start=""; last_ms=0; last_cost=0
+    [ -f "$state" ] && IFS='|' read -r seg_n seg_task seg_ms seg_cost seg_date seg_start last_ms last_cost < "$state"
+    if [ ! -f "$state" ] || [ "$current_task" != "$seg_task" ]; then
+        # The new segment starts where the last tick left off, so the
+        # time between that tick and the switch is not lost.
+        if [ -f "$state" ]; then
+            seg_n=$((seg_n + 1)); seg_ms=${last_ms:-0}; seg_cost=${last_cost:-0}
+        fi
+        seg_task="$current_task"
+        seg_date=$(date '+%Y-%m-%d'); seg_start=$(date '+%H:%M')
+    fi
+    printf '%s|%s|%s|%s|%s|%s|%s|%s\n' "$seg_n" "$seg_task" "$seg_ms" "$seg_cost" "$seg_date" "$seg_start" \
+        "$total_duration_ms" "$total_cost_raw" > "$state" 2>/dev/null
+    seg_dur=$((total_duration_ms - seg_ms))
+    seg_usd=$(awk -v a="$total_cost_raw" -v b="$seg_cost" 'BEGIN{printf "%.4f", a-b}')
+    printf '{"session_id":"%s","seg":%s,"task":"%s","date":"%s","start":"%s","ms":%s,"cost_usd":%s}\n' \
+        "$session_id" "$seg_n" "$seg_task" "$seg_date" "$seg_start" "$seg_dur" "$seg_usd" \
+        > "$sess_dir/$session_id-$seg_n.json" 2>/dev/null
 fi
 
 # ── Output ──────────────────────────────────────────────
