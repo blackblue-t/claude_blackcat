@@ -192,5 +192,5 @@ rg -o 'font-family:[^;]+' --no-filename | sort | uniq -c | sort -rn | head -10
 
 - 風格庫是**參考風格，不是品牌授權**：產出的介面不放對方 logo、品牌名、招牌文案。
 - pencil MCP 可用時，用它取得/同步設計稿的 tokens，DESIGN.md 與設計稿一致。
-- 專案裝有 hallmark、ui-ux-pro-max 時只當額外參考；DESIGN.md 定案後就是唯一契約。
+- ui-ux-pro-max 只查使用體驗，不拿來選風格；DESIGN.md 定案後就是唯一契約。
 - 不寫任何元件程式碼，本站只定規範。

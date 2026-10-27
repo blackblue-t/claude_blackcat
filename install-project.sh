@@ -144,8 +144,7 @@ MAINTENANCE
                    file that changed. Overwrites local edits, so commit
                    the project's .claude/ first.
   --models         Choose again which model each step uses.
-  --ui-refresh     Re-download hallmark and ui-ux-pro-max (old copy is
-                   backed up).
+  --ui-refresh     Re-download ui-ux-pro-max (old copy is backed up).
   --usage          How often each skill / command / agent was used here.
 
 PICK ITEMS BY HAND
@@ -840,6 +839,15 @@ fi
 # Frontend pack (opt-in; dead weight for backend-only projects):
 # /ui-style -> DESIGN.md tokens, /ui-site -> IA + stubs, /ui-page -> deepen
 # one page via the ui-builder agent. Pencil MCP recommended for design sync.
+# Insert the "UX checks only" note after ui-ux-pro-max's frontmatter (once).
+upm_note() {
+    local f="$DEST/skills/ui-ux-pro-max/SKILL.md"
+    [ -f "$f" ] || return 0
+    grep -q '^> blackcat:' "$f" && return 0
+    awk 'BEGIN{n=0} {print} /^---[[:space:]]*$/ && ++n==2 {print ""; print "> blackcat: in this project use this skill only for usability checks (--domain ux or chart): accessibility, touch, forms, navigation, charts. Style, color, fonts and layout come from .claude/ui/DESIGN.md; do not pick them from here."}' \
+        "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+}
+
 install_ui() {
     echo "[ui] installing frontend pack"
     for c in $UI_COMMANDS; do install_md commands "$c"; done
@@ -851,32 +859,11 @@ install_ui() {
         echo "  [note] style library not found at ~/.claude/ui-library"
         echo "         rerun install.bat / install.sh in the blackcat repo to get it"
     fi
-    # Hallmark (github.com/nutlope/hallmark, MIT): anti-AI-slop design
-    # skill -- 20 themes + 57 slop-test gates. Copied into the project
-    # (own-and-customize); not a repo skill, so blackcat's update/cleanup
-    # mechanisms deliberately ignore it.
-    if [ -d "$DEST/skills/hallmark" ]; then
-        echo "  [keep] skills/hallmark (already installed)"
-    else
-        echo "  [hallmark] fetching nutlope/hallmark (anti-AI-slop design skill)..."
-        _hmtmp="$DEST/.hallmark-tmp"
-        rm -rf "$_hmtmp"
-        if git clone --depth 1 https://github.com/nutlope/hallmark "$_hmtmp" >/dev/null 2>&1 \
-           && [ -d "$_hmtmp/skills/hallmark" ]; then
-            mkdir -p "$DEST/skills"
-            cp -r "$_hmtmp/skills/hallmark" "$DEST/skills/hallmark"
-            echo "  [copy] skills/hallmark (20 themes + slop-test gates)"
-        else
-            echo "  [skip] could not fetch hallmark (offline?). Add later with:"
-            echo "         npx skills add nutlope/hallmark"
-        fi
-        rm -rf "$_hmtmp"
-    fi
-    # ui-ux-pro-max (github.com/nextlevelbuilder/ui-ux-pro-max-skill):
-    # searchable design DB (styles/palettes/font pairings/UX guidelines/
-    # a11y checks) queried via its own script -- low context cost. Role
-    # split: pro-max = knowledge base, hallmark = anti-slop personality,
-    # DESIGN.md = the project contract that always wins.
+    # ui-ux-pro-max (github.com/nextlevelbuilder/ui-ux-pro-max-skill, MIT):
+    # searchable UX DB queried via its own script -- low context cost.
+    # Used ONLY for usability checks (a11y, touch, forms, navigation,
+    # charts); looks come from DESIGN.md, so a note saying so is inserted
+    # right after its frontmatter.
     if [ -d "$DEST/skills/ui-ux-pro-max" ] && ! grep -q '^name: *ui-ux-pro-max *$' "$DEST/skills/ui-ux-pro-max/SKILL.md" 2>/dev/null; then
         # Installers before v26.10.2 copied the wrong skill (banner-design)
         # after upstream became a multi-skill repo. Back it up and refetch.
@@ -886,6 +873,7 @@ install_ui() {
     fi
     if [ -d "$DEST/skills/ui-ux-pro-max" ]; then
         echo "  [keep] skills/ui-ux-pro-max (already installed)"
+        upm_note
     else
         echo "  [ui-ux-pro-max] fetching design intelligence DB..."
         _upmtmp="$DEST/.upm-tmp"
@@ -909,6 +897,7 @@ install_ui() {
                 # Upstream paths assume a plugin install; point them at the project copy.
                 sed -i 's#\${CLAUDE_PLUGIN_ROOT}/\.claude/skills/ui-ux-pro-max#.claude/skills/ui-ux-pro-max#g' \
                     "$DEST/skills/ui-ux-pro-max/SKILL.md" 2>/dev/null || true
+                upm_note
                 echo "  [copy] skills/ui-ux-pro-max (styles/palettes/UX guidelines DB)"
             else
                 echo "  [skip] ui-ux-pro-max: unexpected repo layout"
@@ -931,13 +920,13 @@ install_ui() {
     fi
 }
 
-# --ui-refresh: externally fetched skills (hallmark, ui-ux-pro-max) are
+# --ui-refresh: the externally fetched skill (ui-ux-pro-max) is
 # pinned at whatever was latest when installed and are ignored by the
 # normal update flow (they are not this repo's files). This re-fetches
 # them, backing up the old copies first.
 if [ "$UI_REFRESH" = true ] && [ "$UPDATE_ONLY" != true ]; then
     _bku="$DEST/backups/ui-refresh-$(date +%Y%m%d-%H%M%S)"
-    for s in hallmark ui-ux-pro-max; do
+    for s in ui-ux-pro-max; do
         if [ -d "$DEST/skills/$s" ]; then
             mkdir -p "$_bku"
             mv "$DEST/skills/$s" "$_bku/$s"
@@ -1005,6 +994,15 @@ if [ "$TASKMASTER" = true ]; then
     else
         echo "  [keep] settings.json (already exists -- merge TaskMaster hooks manually)"
     fi
+fi
+
+# Hallmark was fetched by --ui up to v26.10.2. Its rules clash with the
+# chosen brand style and duplicate anti-ai.md, so it is retired: move the
+# old copy to backups (never deleted) on any run, --update included.
+if grep -q '^name: *hallmark' "$DEST/skills/hallmark/SKILL.md" 2>/dev/null; then
+    _bkh="$DEST/backups/hallmark-$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$_bkh" && mv "$DEST/skills/hallmark" "$_bkh/"
+    echo "[retired] skills/hallmark moved to $_bkh (replaced by ui-style-compliance)"
 fi
 
 # --------------------------------------------------------------- update ----

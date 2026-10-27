@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.10.2**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.10.3**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -178,7 +178,7 @@ user check：git log 確認、push 由你決定 → /dispatch --clean 收 worktr
 - `/ui-page <路徑>`：單頁深化，委派 ui-builder agent。ui-builder 產出後**截圖驗收**：Playwright MCP 截 390 與 1440 兩個寬度並自己看圖、768/1024 查水平捲軸、讀 console 錯誤；沒有 MCP 就用 Playwright CLI 退路；截不到圖一律回 `DONE_WITH_CONCERNS`，不准當作通過。
 - 規範集中在 `ui-style-compliance` skill（寫碼前載入確認、色彩/字體/間距禁令、產出後自檢清單的唯一來源），附三份按需讀的檔：`anti-ai.md`（反 AI 感清單、不准編造價格評論等事實）、`motion.md`（動畫分級、降級與瀏覽器支援度）、`fonts-cjk.md`（繁中字型堆疊、日系風格換繁中字型對照）。
 
-風格庫與 ui-style-compliance 移植自同事的 [claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw)（MIT），風格檔上游見「參考來源」。風格庫是**參考風格，不是品牌授權**：產出的介面不放對方 logo、品牌名與招牌文案。裝 UI 包時另外抓 [Hallmark](https://github.com/nutlope/hallmark) 與 [ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill) 當額外參考，跟 DESIGN.md 或 anti-ai.md 衝突時以後兩者為準；這兩個外抓 skill 不受 `--update` 管，追新版跑 `blackcat --ui-refresh`。
+風格庫與 ui-style-compliance 移植自同事的 [claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw)（MIT），風格檔上游見「參考來源」。風格庫是**參考風格，不是品牌授權**：產出的介面不放對方 logo、品牌名與招牌文案。裝 UI 包時另外抓 [ui-ux-pro-max](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)（MIT），**只用來查使用體驗**（無障礙、觸控、表單、導覽、圖表），安裝時會在它的說明開頭加一行註記，不讓它拿自己的風格與色盤建議蓋過 DESIGN.md；它不受 `--update` 管，追新版跑 `blackcat --ui-refresh`。舊版會一起抓的 Hallmark 已停用：它的規則會跟選定的品牌風格衝突（例如禁止大寫小標、純白底），檢查腳本對每個非 Hallmark 產出的頁面都報錯，還看不懂中文的假數據；任何一次 `blackcat`（含 `--update`）都會把專案裡的舊副本移到 `.claude/backups/`。
 
 **`/verify` vs `/review-code`**（最容易搞混的一對）：verify 問「**跑得起來嗎**」——跑 build/type/lint/test 看紅綠，機械活、用 sonnet、隨時可跑；review-code 問「**寫得對嗎**」——讀 diff 找工具報不出的錯（邏輯漏洞、安全、爛測試），用 Fable、一段工作完成才跑。兩者是**門檻與判斷**的關係：`/review-code` 第 0 步會自己先跑機器檢查，**紅的就停下不審**（建置壞掉的程式碼不值得花貴模型逐行看）。所以你平常不必特地跑 `/verify`，它是給「我只想知道現在有沒有壞」的時刻用的。
 
@@ -494,8 +494,8 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 - [bheadwei/claude-GUNDAM-zh-tw](https://github.com/bheadwei/claude-GUNDAM-zh-tw)（MIT © 2024 Claude Code Universal Template，授權全文見 `THIRD_PARTY_NOTICES.md`；ui-style-compliance、風格庫目錄、ui-builder 截圖驗收、WBS 格式、套件管理器規則、output styles、擴充決策表移植自此，已改寫為本 repo 路徑）
 - UI 風格庫上游（皆 MIT，授權原文在 `ui-library/_licenses/`，每個風格的來源在 `SOURCE.json`）：[VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md)、awesome-design-md-jp、oh-my-design；`self-extracted` 標記的 11 種由 GUNDAM 作者自行整理
 - [ultraworkers/claw-code](https://github.com/ultraworkers/claw-code)
-- [nutlope/hallmark](https://github.com/nutlope/hallmark)（MIT，`--ui` 時抓進專案）
-- [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)（`--ui` 時抓進專案）
+- [nutlope/hallmark](https://github.com/nutlope/hallmark)（MIT，v26.10.3 起停用）
+- [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)（MIT，`--ui` 時抓進專案，只查使用體驗）
 - [Raymondhou0917/speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw)（MIT，已收錄）
 - [blader/humanizer](https://github.com/blader/humanizer)（MIT，已收錄）
 - [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code)
@@ -508,6 +508,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.10.3** | 2026-10-27 | 停用 Hallmark（跟品牌風格衝突、檢查腳本誤報），舊副本自動移到 backups；ui-ux-pro-max 限定只查使用體驗（安裝時加註記）；ui-style-compliance 自檢加三條不分風格的機械檢查（transition: all、動畫改寬高位置、100vw）與 focus-visible、ux 查詢 |
 | **v26.10.2** | 2026-10-27 | `blackcat --help` 說明每個選項；修 `blackcat --list` 在 shim 下報 unknown option；修 ui-ux-pro-max 抓錯 skill（上游改成多 skill repo 後抓到 banner-design，已裝錯的專案跑 `blackcat --ui` 會自動備份並重抓），並把它的搜尋腳本路徑改成專案路徑；terse／plain-language 改為隨 preset 安裝 |
 | **v26.10.1** | 2026-10-27 | 對照 GUNDAM v5.5 補強：dispatcher 修兩個 bug（未 commit 的任務檔自動 commit、`.worktreeinclude` 複製 .env 等忽略檔）；任務回報碼；/review-code 核心改用內建 /code-review，加規格收斂與文件債檢查；坑閘門 hook＋learned/；UI 搬入 104 種風格庫（全域）、ui-style-compliance、截圖驗收、/ui-style 改風格庫選擇＋貼網址抽風格；新增 `--pm` 專案管理包（WBS、/task-add、自動分段時間紀錄、/pm-choose）；output styles terse／plain-language；writing-extensions 決策表；scripts/check-counts.sh；MCP 範本加 brave-search、firecrawl、pencil 並附用途說明 |
 | **v26.9.1** | 2026-09-30 | 新增全域註記寫法規則（不用 emoji、結論先寫、不寫套話、寫具體內容），經全域 CLAUDE.md 帶標記 import 載入，所有專案生效 |

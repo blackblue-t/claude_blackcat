@@ -9,9 +9,9 @@ description: UI/前端產出前後的強制風格檢查（調度器）—— 載
 `.claude/ui/DESIGN.md`（由 `/ui-style` 從風格庫選定並組好），本 skill 強制執行
 前中後三階段檢查。
 
-**和其他 UI skill 的分工**（專案可能也裝了 hallmark、ui-ux-pro-max）：
-`.claude/ui/DESIGN.md` 永遠最優先；反 AI 感的清單以本目錄的 `anti-ai.md` 為準；
-hallmark 與 ui-ux-pro-max 只當額外參考，跟 DESIGN.md 或 `anti-ai.md` 衝突時照這兩份。
+**和 ui-ux-pro-max 的分工**（`--ui` 會一起裝）：長相（色彩、字型、元件樣式、版面個性）
+只看 `.claude/ui/DESIGN.md`，反 AI 感只看本目錄的 `anti-ai.md`；ui-ux-pro-max **只用來查使用
+體驗**（無障礙、觸控、表單、導覽、圖表），不拿它的風格、色盤、字型配對建議。
 
 ---
 
@@ -199,9 +199,29 @@ inline `<button>`；已有 `Card` 不要再寫自訂卡片。
 - [x] 動畫等級：用到的技術沒有超出 `style.json` 的 `motion` 等級（L1 沒有 import 動畫函式庫；L2／L3 照 `motion.md` 第 2 節）
 - [x] 動畫實作：能用原生 CSS（scroll-driven / View Transitions）就沒加動畫庫，而且有不支援時的退路
 - [x] a11y：文字對比 ≥ 4.5:1、focus 狀態可見、觸控目標 ≥ 44px、圖片有 alt
+- [x] 機械檢查：下方三條 grep 都沒有命中（命中但有理由的寫在未達成項目說明）
+- [x] 使用體驗（裝有 ui-ux-pro-max 時）：表單、導覽、觸控與回饋已用它的 `ux` 查詢對照過
 - [x] 斷點：390、1440 已截圖看過；768、1024 沒有水平捲軸
 - [ ] 未達成項目說明：[如有]
 ```
+
+**機械檢查（不分風格都成立，產出後在非 tokens 檔跑）**：
+
+```bash
+grep -rnE 'transition:[[:space:]]*all|transition-all' <產出目錄>          # 只寫要動的屬性
+grep -rnE '(transition|animation)[^;]*\b(width|height|top|left)\b' <產出目錄>  # 改用 transform
+grep -rn '100vw' <產出目錄>                                                 # 有捲軸時會撐出水平捲軸，用 100%
+```
+
+另外確認可互動元素有 `:focus-visible`（`grep -rn 'focus-visible'` 至少命中一次；Tailwind 用 `focus-visible:` 前綴）。
+
+**使用體驗查詢（裝有 ui-ux-pro-max 時）**：
+
+```bash
+python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<這頁的元件，例如 login form validation>" --domain ux
+```
+
+只查 `ux`（必要時 `chart`），不查 `style`、`color`、`typography`，那些以 DESIGN.md 為準。
 
 **斷點規則（唯一來源）**：
 
