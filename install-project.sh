@@ -72,6 +72,8 @@ STRICT_COMMANDS="go grill grill-ui grill-doc plan clean-plan spec dispatch merge
 # (/plans and /tidy -> /clean-plan: explicit name, no near-miss with /plan.)
 RENAMED_COMMANDS="plans:clean-plan tidy:clean-plan"
 WRITING_SKILLS="speak-human-tw humanizer"
+# Reply styles: inert until picked with /output-style, so both presets ship them.
+PRESET_STYLES="terse plain-language"
 UI_COMMANDS="ui-style ui-site ui-page pm-choose"
 UI_AGENTS="ui-builder"
 UI_SKILLS="ui-style-compliance package-manager"
@@ -98,16 +100,81 @@ list_items() {
     echo "--taskmaster  (project-template: TaskMaster hooks + settings + coordination)"
 }
 
-if [ "$1" = "--list" ] || [ -z "$1" ]; then
-    echo "Usage: bash install-project.sh <project-path> [--lean|--strict|--all] [--writing] [--ui] [--pm] [--taskmaster] [--rules lang1,lang2 | --no-rules] [--models] [--update] [--skills a,b] [--commands x,y] [--agents m,n] [--output-styles p,q]"
-    echo ""
-    echo "  --lean     fast-iteration preset: $LEAN_SKILLS (default)"
-    echo "  --strict   production preset:     $STRICT_SKILLS"
-    echo "  --writing  writing pack (stacks): $WRITING_SKILLS"
-    echo ""
-    list_items
-    exit 0
-fi
+show_help() {
+    cat <<HELP
+blackcat - install the blackcat Claude Code workflow into this project
+
+Usage:  blackcat [options]        (runs on the current folder)
+        bash install-project.sh <project-path> [options]
+
+Run with no option = --lean. Re-running is safe: files already in the
+project are kept ([keep]); changed ones are offered at the end.
+
+PRESETS (pick one)
+  --lean           Fast iteration. Minimal code (ponytail), /go one-stop
+                   flow, plan -> build -> review -> commit. (default)
+  --strict         Production. Same flow + test-first (/tdd), /verify,
+                   /spec. Do not mix with --lean.
+
+ADD-ON PACKS (combine freely)
+  --ui             Frontend: pick a style from 104 references (/ui-style),
+                   site map (/ui-site), build pages (/ui-page) with
+                   screenshot checks.
+  --pm             Project management: WBS task list (/task-init,
+                   /task-next, /task-status), automatic time log
+                   (/time-log), package manager choice (/pm-choose).
+  --writing        Writing: remove AI tone from Chinese / English text.
+
+REPLY STYLES (installed with every preset; switch in Claude Code with
+/output-style)
+  terse            Results and next step only. For when you are rushing.
+  plain-language   Conclusion and impact first, technical terms explained
+                   in one plain sentence the first time.
+  --graphify       Code knowledge graph to save tokens on big projects
+                   (needs the graphify CLI).
+  --taskmaster     Old TaskMaster hooks. New projects: use --pm instead.
+
+CODING RULES
+  --rules python   Add coding rules (common + the language) to CLAUDE.md.
+                   Languages: python, typescript, rust (comma separated).
+  --no-rules       Do not ask about rules.
+
+MAINTENANCE
+  --update         After 'git pull' of blackcat: refresh every installed
+                   file that changed. Overwrites local edits, so commit
+                   the project's .claude/ first.
+  --models         Choose again which model each step uses.
+  --ui-refresh     Re-download hallmark and ui-ux-pro-max (old copy is
+                   backed up).
+  --usage          How often each skill / command / agent was used here.
+
+PICK ITEMS BY HAND
+  --skills a,b  --commands x,y  --agents m,n  --output-styles p,q
+  --all            Install everything (not recommended).
+  --list           Show every item name you can pick.
+  --help, -h       This help.
+
+Parallel tasks (separate tool): bcd --help
+Full guide (Chinese): README.md in the blackcat repo.
+HELP
+}
+
+# --help / --list may come anywhere: the blackcat shim always puts the
+# current folder first, so they are rarely the first argument.
+for _a in "$@"; do
+    case "$_a" in
+        -h|--help) show_help; exit 0 ;;
+        --list)
+            echo "Presets:"
+            echo "  --lean     skills: $LEAN_SKILLS"
+            echo "  --strict   skills: $STRICT_SKILLS"
+            echo "  --writing  skills: $WRITING_SKILLS"
+            echo ""
+            list_items
+            exit 0 ;;
+    esac
+done
+if [ -z "$1" ]; then show_help; exit 0; fi
 
 TARGET="$1"; shift
 if [ ! -d "$TARGET" ]; then
@@ -282,6 +349,7 @@ else
     if [ -z "$COMMANDS" ]; then
         [ "$PRESET" = "strict" ] && COMMANDS="$STRICT_COMMANDS" || COMMANDS="$LEAN_COMMANDS"
     fi
+    [ -z "$STYLES" ] && STYLES="$PRESET_STYLES"
     echo "[preset] $PRESET"
 fi
 
@@ -809,6 +877,13 @@ install_ui() {
     # a11y checks) queried via its own script -- low context cost. Role
     # split: pro-max = knowledge base, hallmark = anti-slop personality,
     # DESIGN.md = the project contract that always wins.
+    if [ -d "$DEST/skills/ui-ux-pro-max" ] && ! grep -q '^name: *ui-ux-pro-max *$' "$DEST/skills/ui-ux-pro-max/SKILL.md" 2>/dev/null; then
+        # Installers before v26.10.2 copied the wrong skill (banner-design)
+        # after upstream became a multi-skill repo. Back it up and refetch.
+        _bkw="$DEST/backups/ui-ux-pro-max-wrong-$(date +%Y%m%d-%H%M%S)"
+        mkdir -p "$_bkw" && mv "$DEST/skills/ui-ux-pro-max" "$_bkw/"
+        echo "  [fix] skills/ui-ux-pro-max held a different skill; moved to $_bkw"
+    fi
     if [ -d "$DEST/skills/ui-ux-pro-max" ]; then
         echo "  [keep] skills/ui-ux-pro-max (already installed)"
     else
@@ -816,17 +891,24 @@ install_ui() {
         _upmtmp="$DEST/.upm-tmp"
         rm -rf "$_upmtmp"
         if git clone --depth 1 https://github.com/nextlevelbuilder/ui-ux-pro-max-skill "$_upmtmp" >/dev/null 2>&1; then
+            # The upstream repo holds several skills (banner-design, brand,
+            # slides ...). Take the one whose frontmatter says
+            # name: ui-ux-pro-max, never just the first SKILL.md found.
             _upmsrc=""
-            if [ -f "$_upmtmp/SKILL.md" ]; then
-                _upmsrc="$_upmtmp"
-            else
-                _upmfound="$(find "$_upmtmp" -name SKILL.md -not -path '*/.git/*' 2>/dev/null | head -1)"
+            for _c in "$_upmtmp/.claude/skills/ui-ux-pro-max" "$_upmtmp"; do
+                if grep -q '^name: *ui-ux-pro-max *$' "$_c/SKILL.md" 2>/dev/null; then _upmsrc="$_c"; break; fi
+            done
+            if [ -z "$_upmsrc" ]; then
+                _upmfound="$(grep -rl --include=SKILL.md '^name: *ui-ux-pro-max *$' "$_upmtmp" 2>/dev/null | grep -v '/\.git/' | head -1)"
                 [ -n "$_upmfound" ] && _upmsrc="$(dirname "$_upmfound")"
             fi
             if [ -n "$_upmsrc" ] && [ -f "$_upmsrc/SKILL.md" ]; then
                 mkdir -p "$DEST/skills"
-                cp -r "$_upmsrc" "$DEST/skills/ui-ux-pro-max"
+                cp -rL "$_upmsrc" "$DEST/skills/ui-ux-pro-max"
                 rm -rf "$DEST/skills/ui-ux-pro-max/.git"
+                # Upstream paths assume a plugin install; point them at the project copy.
+                sed -i 's#\${CLAUDE_PLUGIN_ROOT}/\.claude/skills/ui-ux-pro-max#.claude/skills/ui-ux-pro-max#g' \
+                    "$DEST/skills/ui-ux-pro-max/SKILL.md" 2>/dev/null || true
                 echo "  [copy] skills/ui-ux-pro-max (styles/palettes/UX guidelines DB)"
             else
                 echo "  [skip] ui-ux-pro-max: unexpected repo layout"

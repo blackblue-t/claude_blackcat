@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.10.1**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.10.2**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -55,7 +55,8 @@ blackcat --update     :: 純更新模式：blackcat repo 更新後，刷新專�
 blackcat --usage      :: 用量統計：這個專案的 skills/commands/agents 各用過幾次、哪些裝了沒用過（別名 --skill-freq）
 blackcat --graphify   :: 加裝 Graphify 知識圖譜（省 token；需先裝 graphify CLI）
 bcd                   :: 並行任務調度（blackcat-dispatch 的短別名；Claude Code 裡用 /dispatch）
-blackcat --list       :: 看全部選項
+blackcat --help       :: 每個選項的說明（英文，Windows 主控台顯示中文會亂碼）
+blackcat --list       :: 列出所有可單獨挑選的項目名稱
 blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 ```
 
@@ -428,7 +429,7 @@ bcd --clean         # 移除 worktree、刪已合併分支
 皆為選裝庫，預設 preset **不裝**（與 skills 同概念重疊，遵守「同一概念只留一層」）。真的需要再 `--agents` / `--output-styles` 指定：
 
 - **Agents**：planner、architect、tdd-guide、code-reviewer、security-reviewer、build-error-resolver、e2e-runner、refactor-cleaner、doc-updater、docs-lookup、database-reviewer、python-reviewer、typescript-reviewer、rust-reviewer、rust-build-resolver、pytorch-build-resolver、chief-of-staff、ui-builder（`--ui` 自動裝）
-- **Output Styles（回覆方式）**：`terse`（趕工用，只給結果和下一步）、`plain-language`（先白話講結論與影響，術語第一次出現附一句白話）。裝進專案後在 Claude Code 用 `/output-style` 切換
+- **Output Styles（回覆方式，兩個 preset 都會裝）**：只改 Claude 在對話裡回覆你的寫法，不影響程式碼與文件（那是全域註記寫法管的）。`terse` 趕工用，只給結果和下一步，不解釋過程；`plain-language` 先用白話講結論與影響，再列技術細節，術語第一次出現附一句白話。在 Claude Code 打 `/output-style` 選，或在專案 `.claude/settings.json` 寫 `"outputStyle": "plain-language"` 固定下來。不選就是預設回覆方式
 - **Output Styles（文件模板）**：01-prd-product-spec、02-bdd-scenario-spec、03-architecture-design-doc、04-ddd-aggregate-spec、05-api-contract-spec、06-tdd-unit-spec、07-code-review-checklist、08-security-checklist、09-database-schema-spec、10-backend-python-impl、11-frontend-component-bdd、12-integration-contract-suite、13-data-contract-evolution、14-ci-quality-gates、15-Vision-output（適合要產出規格文件的場合）
 
 **維護這個 repo**：新增或刪除 skill、command、agent、output style、風格後跑 `bash scripts/check-counts.sh`，它會檢查 README 的計數、安裝器 preset 名單是否都存在、有沒有項目 README 沒提到、風格庫目錄是否一致、安裝腳本是否純 ASCII。
@@ -507,6 +508,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.10.2** | 2026-10-27 | `blackcat --help` 說明每個選項；修 `blackcat --list` 在 shim 下報 unknown option；修 ui-ux-pro-max 抓錯 skill（上游改成多 skill repo 後抓到 banner-design，已裝錯的專案跑 `blackcat --ui` 會自動備份並重抓），並把它的搜尋腳本路徑改成專案路徑；terse／plain-language 改為隨 preset 安裝 |
 | **v26.10.1** | 2026-10-27 | 對照 GUNDAM v5.5 補強：dispatcher 修兩個 bug（未 commit 的任務檔自動 commit、`.worktreeinclude` 複製 .env 等忽略檔）；任務回報碼；/review-code 核心改用內建 /code-review，加規格收斂與文件債檢查；坑閘門 hook＋learned/；UI 搬入 104 種風格庫（全域）、ui-style-compliance、截圖驗收、/ui-style 改風格庫選擇＋貼網址抽風格；新增 `--pm` 專案管理包（WBS、/task-add、自動分段時間紀錄、/pm-choose）；output styles terse／plain-language；writing-extensions 決策表；scripts/check-counts.sh；MCP 範本加 brave-search、firecrawl、pencil 並附用途說明 |
 | **v26.9.1** | 2026-09-30 | 新增全域註記寫法規則（不用 emoji、結論先寫、不寫套話、寫具體內容），經全域 CLAUDE.md 帶標記 import 載入，所有專案生效 |
 | **v26.8.3** | 2026-08-08 | 看板 who: 改記真實 session 名稱（有 ListAgents 時）；新增 /session ask-review：有訊息工具指名 reviewer 跑審、否則 headless 一次性審查（天然免 clear）；明確記載 /clear 無法由模型或遠端執行 |
