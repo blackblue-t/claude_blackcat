@@ -13,7 +13,8 @@ description: 前端第一站：從 104 種風格庫挑（看預覽、自己挑�
 在 blackcat repo 重跑 `install.bat`／`install.sh`；在那之前只能走路徑 H、E 或純問答。
 
 用法：`/ui-style`（互動）、`/ui-style apple`（直接指定）、`/ui-style linear.app+stripe`
-（混搭，`+` 後面的逐項問要覆蓋哪幾項）。帶參數時跳過步驟 1、3。
+（混搭，`+` 後面的逐項問要覆蓋哪幾項）、`/ui-style --preview`（不改設定，只依現有
+DESIGN.md 重產樣張並打開，直接跳到步驟 6）。帶 codename 時跳過步驟 1、3。
 
 ## 互動原則
 
@@ -24,7 +25,7 @@ description: 前端第一站：從 104 種風格庫挑（看預覽、自己挑�
 ## 步驟 0：已經有設定時
 
 `.claude/ui/style.json` 或 `.claude/ui/DESIGN.md` 存在 → 先顯示目前設定，再問：
-重新選風格（建議）／只補網站類型和動畫等級／取消。
+重新選風格（建議）／只看樣張（跳到步驟 6）／只補網站類型和動畫等級／取消。
 
 ## 步驟 1：入口
 
@@ -74,7 +75,10 @@ description: 前端第一站：從 104 種風格庫挑（看預覽、自己挑�
 4. 用 `AskUserQuestion` 的 `preview` 呈現：`label` 是白話方向名，`preview` 至少 4 個
    `#RRGGBB` 色票＋至少 3 行 ASCII 版面示意，並寫「對應風格：attio（單一）」或
    「linear.app（主）＋ 配色 stripe」。
-5. 都不喜歡 → 依回饋再提一輪；兩輪都不中就建議改走「我自己挑」或「貼網址」。
+5. 問題最後加一個選項「先看實際畫面再選」。選了就照下方「步驟 6」的作法，把三個方向
+   並排做成一頁 `.claude/tmp/ui-preview/directions.html`（每個方向一欄：色票、標題與內文、
+   按鈕、一張卡片、一小段版面），用瀏覽器打開，再問一次同一題（不含這個選項）。
+6. 都不喜歡 → 依回饋再提一輪；兩輪都不中就建議改走「我自己挑」或「貼網址」。
 
 ### 路徑 A：單一風格
 
@@ -172,10 +176,54 @@ rg -o 'font-family:[^;]+' --no-filename | sort | uniq -c | sort -rn | head -10
 
 `source`：`preview`／`catalog`／`url`／`code-scan`。路徑 H、E 的 `primary` 寫 `"_project"`。
 
+## 步驟 6：風格樣張（寫完檔一定要做）
+
+只看文字規格，使用者想像不出畫面。寫完兩個檔後，產一頁 `.claude/ui/preview.html` 給使用者
+用眼睛確認。**這是看規範長什麼樣的樣張，不是網站的任何一頁**。
+
+**內容**（由上而下，每區一個小標）：
+
+1. 色票：每個 token 一格，標名稱、hex、用途；文字色標出對它的背景的對比值（例如 `7.8:1`），
+   低於 4.5:1 的標「不足」
+2. 字級：h1～h4、內文、說明文字各一行，中英文都要有（例如「標題範例 Heading Sample 2026」）
+3. 元件：主要／次要／停用按鈕（hover 與 focus 狀態另外排一個）、輸入框（一般與錯誤）、
+   卡片、徽章、公告列、深色區塊——DESIGN.md 有定義的才做
+4. 間距、圓角、邊框、陰影：各畫一排小方塊
+5. icon：用 `style.json` 的 `icon_set` 放 6 個常見 icon（選單、搜尋、購物車、地圖、電話、關閉）
+6. 一小段組合示意：標題＋一段內文＋按鈕＋兩張卡片，看整體感。動畫等級是 L2／L3 時，這一段
+   做往下捲依序出現的效果（並處理 `prefers-reduced-motion`）
+
+**寫法規則**：
+
+- 單一 HTML 檔，不依賴專案的建置工具；字型與 icon 可以從 CDN 載（Google Fonts、lucide）
+- 所有顏色、字型、間距寫在 `:root` 的 CSS 變數，值完全取自 DESIGN.md（「專案補充」優先），
+  `:root` 以外不准出現 hex
+- 範例文字用中性的「標題範例」「這是一段內文範例」，**不放原品牌的店名、logo、文案**，也不編
+  價格、地址這類事實
+- 寫一份 `.claude/ui/.gitignore`，內容 `preview.html`（樣張隨時可重產，不進版控）
+
+**打開給使用者看**：
+
+- Windows（Claude Code 的 Bash 是 Git Bash）：`cmd.exe //c start "" "<preview.html 的絕對路徑>"`；
+  macOS：`open <路徑>`；Linux：`xdg-open <路徑>`
+- 有 Playwright MCP 時另外自己截 390 與 1440 兩張（Playwright 擋 `file://`，先用
+  `python -m http.server` 在 `.claude/ui` 起一個臨時伺服器，看完關掉），用 Read 看圖檢查破版、
+  字型沒載到、對比不足，有問題先修樣張再給使用者
+- 沒辦法開瀏覽器（例如遠端環境）→ 給檔案的完整路徑，請使用者自己打開；有截圖就附截圖路徑
+
+**確認**：用 `AskUserQuestion` 問「樣張看起來對嗎？」：
+
+| 選項 | 之後 |
+|---|---|
+| 對，就這樣（建議） | 定案，進完成訊息 |
+| 要調整（直接說哪裡） | 改 DESIGN.md 的「專案補充」與 `style.json`，重產樣張再問一次 |
+| 整個重選 | 回步驟 1 |
+
 ## 完成訊息
 
-列出兩個檔的路徑、主風格、動畫等級，提醒下一步 `/ui-site` 建站點結構，或直接
-`/ui-page <路徑>` 做單頁。
+列出三個檔的路徑（DESIGN.md、style.json、preview.html）、主風格、動畫等級，提醒下一步
+`/ui-site` 建站點結構，或直接 `/ui-page <路徑>` 做單頁。之後改了 DESIGN.md，用
+`/ui-style --preview` 重看樣張。
 
 ## 檔案落點約定（前端三部曲共用）
 
@@ -184,6 +232,7 @@ rg -o 'font-family:[^;]+' --no-filename | sort | uniq -c | sort -rn | head -10
 | `.pen` 設計稿 | `design/site.pen`（大專案可拆 `design/<區域>.pen`） | 是 | 產品設計源檔 |
 | DESIGN.md | `.claude/ui/DESIGN.md` | 是 | 風格契約 |
 | style.json | `.claude/ui/style.json` | 是 | 選擇紀錄 |
+| 風格樣張 | `.claude/ui/preview.html` | 否（隨時重產） | 看規範長什麼樣 |
 | IA.md | `.claude/ui/IA.md` | 是 | 資訊架構契約 |
 | 灰框原型 | `.claude/ui/prototype/` | 否（即棄） | 動線驗證 |
 | 截圖 | `.claude/tmp/ui-screenshots/` | 否 | 驗收用 |
@@ -193,4 +242,4 @@ rg -o 'font-family:[^;]+' --no-filename | sort | uniq -c | sort -rn | head -10
 - 風格庫是**參考風格，不是品牌授權**：產出的介面不放對方 logo、品牌名、招牌文案。
 - pencil MCP 可用時，用它取得/同步設計稿的 tokens，DESIGN.md 與設計稿一致。
 - ui-ux-pro-max 只查使用體驗，不拿來選風格；DESIGN.md 定案後就是唯一契約。
-- 不寫任何元件程式碼，本站只定規範。
+- 不寫網站的任何頁面或元件程式碼，本站只定規範；樣張是唯一例外，而且只放在 `.claude/ui/`。
