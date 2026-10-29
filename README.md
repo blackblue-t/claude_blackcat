@@ -1,11 +1,11 @@
 # claude_blackcat
 
-**版本：v26.10.5**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.10.6**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
 ```
-全域（~/.claude/）：settings + statusline + 註記寫法 + UI 風格庫 + cat 指令 ← 偏好，跟人走
+全域（~/.claude/）：settings + statusline + 註記寫法 + 命名規則 + UI 風格庫 + cat 指令 ← 偏好，跟人走
 專案（.claude/）  ：1-4 個 skills + 3-5 個 commands         ← 工作流，跟專案走
 產出（.claude/）  ：plans/ + sessions/                      ← 記憶，跟專案進 git
 ```
@@ -447,6 +447,8 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 **註記寫法**（`global/notes-style.md`）：規定 Claude 寫程式碼註解、commit message、worklog、PR 說明、專案文件時不用 emoji 與裝飾符號、結論先寫、不寫套話、寫具體的檔名與數字。做成全域規則而不是 skill：skill 靠模型判斷要不要觸發，實測會漏（tdd-workflow 曾在 /tdd 跑 19 次時觸發 0 次），而註記規矩必須每次都生效，所以透過全域 CLAUDE.md import 載入，每個 session、每個專案都套用。要調整寫法直接改這個檔案，重跑 `install.bat` 生效。
 
+**命名規則**（`global/naming-style.md`）：跟註記寫法一樣經全域 CLAUDE.md import 載入，每個專案都生效。重點：新增檔案、類別、對外函式前先列「命名表」（名稱、角色、中文說明）給你看；類別用名詞、函式用動詞＋對象、真假值用 is/has 開頭；角色後綴對照（Parser、Runner、Benchmark、Uploader、Client、Repository…）；禁用 process、handle、manage、data、Util、Helper 這類含糊字和自創縮寫；名稱最多 4 個單字；改名時一次改完所有引用並保持 .bat 的 CRLF；第一次提到名稱附中文。流程上的控制點：`/plan` 計畫要附命名表跟計畫一起確認，`/review-code` 會檢查命名是否照規則、名稱和實際行為是否一致，`/go` 快車道回報也附命名表。專案已有自己的命名慣例時照專案的。
+
 **Statusline**：多行彩色（模型 │ context │ 目錄+branch │ 時長 │ 花費 + rate limit 進度條）——把「現在燒多快」常駐在眼前，才會記得省。需要 `jq`，install.sh 會檢查。專案有 `.claude/taskmaster-data/` 時順便寫時間紀錄（見「專案管理」）。
 
 **UI 風格庫**（`~/.claude/ui-library/`）：104 種設計系統（每種一份 DESIGN.md＋SOURCE.json 記來源與授權），`CATALOG.md` 是繁中目錄。全域一份，`/ui-style` 只把選中的組進專案。
@@ -509,6 +511,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.10.6** | 2026-10-29 | 新增全域命名規則 `naming-style.md`（命名表先確認、詞性、角色後綴、禁用字、改名程序、回報附中文），install.bat 自動加進全域 CLAUDE.md；/plan 附命名表、/review-code 檢查命名、/go 快車道回報附命名表 |
 | **v26.10.5** | 2026-10-29 | 新增 `/ui-add <網址>`：把喜歡的網站收進風格庫（Playwright 抽取腳本、截圖確認、寫成 `ui-library/my-<代號>/`、登記 CATALOG「我的收藏」）；`install.bat` 記下 repo 路徑到 `~/.claude/blackcat-repo`；`_sources.json` 授權路徑改正 |
 | **v26.10.4** | 2026-10-29 | /ui-style 寫完設定後產風格樣張 `.claude/ui/preview.html` 並用瀏覽器打開，確認才定案；看預覽選方向時可先看三個方向的實際畫面；新增 `/ui-style --preview` 只重產樣張 |
 | **v26.10.3** | 2026-10-27 | 停用 Hallmark（跟品牌風格衝突、檢查腳本誤報），舊副本自動移到 backups；ui-ux-pro-max 限定只查使用體驗（安裝時加註記）；ui-style-compliance 自檢加三條不分風格的機械檢查（transition: all、動畫改寬高位置、100vw）與 focus-visible、ux 查詢 |

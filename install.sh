@@ -3,7 +3,8 @@
 # claude_blackcat global installer
 #
 # Installs ONLY the global layer: settings.json + statusline-command.sh +
-# notes-style.md (how Claude writes notes), plus the project-installer shims.
+# notes-style.md (how Claude writes notes) + naming-style.md (how Claude
+# names files, classes and functions), plus the project-installer shims.
 #
 # Before installing, it cleans up items that OLDER versions of this repo
 # put into ~/.claude (agents, commands, output-styles, rules, hooks, and
@@ -121,6 +122,7 @@ install_file() {
 install_file "$GLOBAL_SRC/settings.json" "$CLAUDE_DIR/settings.json" "settings.json"
 install_file "$GLOBAL_SRC/statusline-command.sh" "$CLAUDE_DIR/statusline-command.sh" "statusline-command.sh"
 install_file "$GLOBAL_SRC/notes-style.md" "$CLAUDE_DIR/notes-style.md" "notes-style.md"
+install_file "$GLOBAL_SRC/naming-style.md" "$CLAUDE_DIR/naming-style.md" "naming-style.md"
 
 # UI style library (104 reference design systems). One global copy that
 # /ui-style reads from; it copies only the chosen style into a project.
@@ -149,18 +151,22 @@ echo "  [ok] blackcat-repo -> $REPO_PATH"
 # Append a marked import block to the global CLAUDE.md; existing content
 # is left untouched and re-runs never duplicate the block.
 GLOBAL_MD="$CLAUDE_DIR/CLAUDE.md"
-NOTES_MARK="<!-- blackcat:notes-style -->"
-if [ -f "$GLOBAL_MD" ] && grep -qF "$NOTES_MARK" "$GLOBAL_MD"; then
-    echo "  [keep] CLAUDE.md import for notes-style (already present)"
-else
+add_import() { # $1=rule name (file ~/.claude/<name>.md)
+    local mark="<!-- blackcat:$1 -->"
+    if [ -f "$GLOBAL_MD" ] && grep -qF "$mark" "$GLOBAL_MD"; then
+        echo "  [keep] CLAUDE.md import for $1 (already present)"
+        return
+    fi
     {
         [ -s "$GLOBAL_MD" ] && echo ""
-        echo "$NOTES_MARK"
-        echo "@~/.claude/notes-style.md"
-        echo "<!-- /blackcat:notes-style -->"
+        echo "$mark"
+        echo "@~/.claude/$1.md"
+        echo "<!-- /blackcat:$1 -->"
     } >> "$GLOBAL_MD"
-    echo "  [add] CLAUDE.md import for notes-style"
-fi
+    echo "  [add] CLAUDE.md import for $1"
+}
+add_import notes-style
+add_import naming-style
 
 echo ""
 echo "[3/3] Creating project-installer command..."

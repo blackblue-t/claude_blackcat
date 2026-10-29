@@ -75,6 +75,10 @@ model: claude-fable-5
   - 描述失真：規格和實作講的是兩回事
   前兩種標 `[fix]` 或 `[design]`；描述失真看哪邊對，實作錯標 `[fix]`，
   規格寫錯標 `[requirement]`。**不要自己改規格文件**，那是使用者的決定。
+- **命名**：範圍內新增或改名的檔案、類別、函式，照全域 `naming-style.md` 檢查——類別是
+  不是名詞、函式是不是動詞開頭、有沒有用到禁用字、名稱和實際行為對不對得上（名叫
+  `getX` 卻會寫資料庫、名叫 `parse` 卻還上傳）。計畫有「命名表」時對照它。標 `[fix]`，
+  附建議的新名稱和中文說明；改名會動到對外介面時改標 `[design]`。
 - **文件債**：範圍內改到對外介面（API 路由、controller、OpenAPI／proto、
   資料庫 schema 與 migration、套件公開的 export、CLI 參數），但對應的
   文件（README、`docs/`、API 文件、CHANGELOG）在這次範圍內沒有一起改
