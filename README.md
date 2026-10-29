@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.10.4**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.10.5**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -174,6 +174,7 @@ user check：git log 確認、push 由你決定 → /dispatch --clean 收 worktr
 **前端專案**另有三部曲（初始化時選裝或 `blackcat --ui` 隨時加）：
 
 - `/ui-style`：從 **104 種風格庫**（`~/.claude/ui-library/`，全域裝一次）挑風格——看三個方向的配色與版面預覽挑一個、自己挑單一品牌、混搭（配色/字體/元件/版面各取一家）、**貼網址抽風格**（firecrawl 或 Playwright 讀色票字型，不搬 logo 與文案）、或照專案現有樣式反推。再問品牌色（給 hex 生成色階、深色版、WCAG 對比檢查）、icon 集、元件策略、網站類型與動畫等級（L1 安靜／L2 有節奏／L3 沉浸）。產出 `.claude/ui/DESIGN.md`（唯一風格契約）與 `.claude/ui/style.json`。寫完會產一頁**風格樣張** `.claude/ui/preview.html`（色票與對比值、字級、按鈕輸入框卡片徽章、icon、一小段組合示意）並用瀏覽器打開，你看過確認才定案；選方向時也可以先看三個方向的實際畫面。之後改了 DESIGN.md，用 `/ui-style --preview` 重看。
+- `/ui-add <網址>`：把喜歡的網站收進自己的風格庫。用 Playwright 開網站，抓配色、字型、字級、按鈕輸入框樣式、圓角、間距、版寬、斷點（抽取腳本在 `ui-library/_tools/extract-style.js`），截 1440 與 390 兩張圖給你確認，再寫成跟庫裡其他風格同格式的 DESIGN.md，存成 `ui-library/my-<代號>/` 並登記到 CATALOG 的「我的收藏」。存在 blackcat repo 裡，commit 並 push 後其他電腦也有。不收 logo、圖片、文案。
 - `/ui-site`：IA 契約＋路由 stubs，可選灰框可點原型。
 - `/ui-page <路徑>`：單頁深化，委派 ui-builder agent。ui-builder 產出後**截圖驗收**：Playwright MCP 截 390 與 1440 兩個寬度並自己看圖、768/1024 查水平捲軸、讀 console 錯誤；沒有 MCP 就用 Playwright CLI 退路；截不到圖一律回 `DONE_WITH_CONCERNS`，不准當作通過。
 - 規範集中在 `ui-style-compliance` skill（寫碼前載入確認、色彩/字體/間距禁令、產出後自檢清單的唯一來源），附三份按需讀的檔：`anti-ai.md`（反 AI 感清單、不准編造價格評論等事實）、`motion.md`（動畫分級、降級與瀏覽器支援度）、`fonts-cjk.md`（繁中字型堆疊、日系風格換繁中字型對照）。
@@ -382,7 +383,7 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 ---
 
-## Commands 詳解（29 個）
+## Commands 詳解（30 個）
 
 ### 核心五個（presets 內含）
 
@@ -400,7 +401,7 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 ### 前端包（`--ui`）
 
-`/ui-style` `/ui-site` `/ui-page` `/pm-choose`
+`/ui-style` `/ui-add` `/ui-site` `/ui-page` `/pm-choose`
 
 ### 專案管理包（`--pm`）
 
@@ -508,6 +509,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.10.5** | 2026-10-29 | 新增 `/ui-add <網址>`：把喜歡的網站收進風格庫（Playwright 抽取腳本、截圖確認、寫成 `ui-library/my-<代號>/`、登記 CATALOG「我的收藏」）；`install.bat` 記下 repo 路徑到 `~/.claude/blackcat-repo`；`_sources.json` 授權路徑改正 |
 | **v26.10.4** | 2026-10-29 | /ui-style 寫完設定後產風格樣張 `.claude/ui/preview.html` 並用瀏覽器打開，確認才定案；看預覽選方向時可先看三個方向的實際畫面；新增 `/ui-style --preview` 只重產樣張 |
 | **v26.10.3** | 2026-10-27 | 停用 Hallmark（跟品牌風格衝突、檢查腳本誤報），舊副本自動移到 backups；ui-ux-pro-max 限定只查使用體驗（安裝時加註記）；ui-style-compliance 自檢加三條不分風格的機械檢查（transition: all、動畫改寬高位置、100vw）與 focus-visible、ux 查詢 |
 | **v26.10.2** | 2026-10-27 | `blackcat --help` 說明每個選項；修 `blackcat --list` 在 shim 下報 unknown option；修 ui-ux-pro-max 抓錯 skill（上游改成多 skill repo 後抓到 banner-design，已裝錯的專案跑 `blackcat --ui` 會自動備份並重抓），並把它的搜尋腳本路徑改成專案路徑；terse／plain-language 改為隨 preset 安裝 |

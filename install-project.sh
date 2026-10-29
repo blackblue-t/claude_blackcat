@@ -74,7 +74,7 @@ RENAMED_COMMANDS="plans:clean-plan tidy:clean-plan"
 WRITING_SKILLS="speak-human-tw humanizer"
 # Reply styles: inert until picked with /output-style, so both presets ship them.
 PRESET_STYLES="terse plain-language"
-UI_COMMANDS="ui-style ui-site ui-page pm-choose"
+UI_COMMANDS="ui-style ui-add ui-site ui-page pm-choose"
 UI_AGENTS="ui-builder"
 UI_SKILLS="ui-style-compliance package-manager"
 PM_COMMANDS="task-init task-add task-next task-status time-log pm-choose"

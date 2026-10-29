@@ -136,6 +136,14 @@ if [ -d "$SCRIPT_DIR/ui-library" ]; then
     fi
 fi
 
+# Where this repo lives, so commands such as /ui-add can write back into
+# it (ui-library/ is the source; ~/.claude/ui-library is only a copy on
+# Windows). Mixed-style path on Windows so both bash and Windows tools work.
+REPO_PATH="$SCRIPT_DIR"
+command -v cygpath >/dev/null 2>&1 && REPO_PATH="$(cygpath -m "$SCRIPT_DIR")"
+printf '%s\n' "$REPO_PATH" > "$CLAUDE_DIR/blackcat-repo"
+echo "  [ok] blackcat-repo -> $REPO_PATH"
+
 # Rules only reach the model through a CLAUDE.md import, and a skill's
 # auto-trigger is not reliable enough for a rule that applies to every note.
 # Append a marked import block to the global CLAUDE.md; existing content
