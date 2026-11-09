@@ -15,7 +15,8 @@
 #   bash install-project.sh <project-path> --taskmaster # add TaskMaster workflow (project-template)
 #   bash install-project.sh <project-path> --update     # update-only: refresh installed items that changed in this repo
 #   bash install-project.sh <project-path> --models     # re-open the per-stage model picker
-#   bash install-project.sh <project-path> --graphify   # set up Graphify knowledge graph (token saver, needs graphify CLI)
+#   bash install-project.sh <project-path> --graphify   # set up Graphify knowledge graph (experimental, needs graphify CLI)
+#   bash install-project.sh <project-path> --graphify-remove  # take Graphify back out of a project
 #   bash install-project.sh <project-path> --ui         # frontend pack: style library, /ui-style /ui-site /ui-page
 #   bash install-project.sh <project-path> --pm         # project management pack: WBS, time log, package manager
 #   bash install-project.sh --list                      # list available items
@@ -130,8 +131,12 @@ REPLY STYLES (installed with every preset; switch in Claude Code with
   terse            Results and next step only. For when you are rushing.
   plain-language   Conclusion and impact first, technical terms explained
                    in one plain sentence the first time.
-  --graphify       Code knowledge graph to save tokens on big projects
-                   (needs the graphify CLI).
+  --graphify       Code knowledge graph (experimental, needs the graphify
+                   CLI). Measured on a real project: Claude ignored it and
+                   grep answered better. Try only on huge single-language
+                   code bases, and check /time-log or --usage afterwards.
+  --graphify-remove  Take Graphify back out: its skill, CLAUDE.md section,
+                   hooks and git hooks. Asks before deleting graphify-out/.
   --taskmaster     Old TaskMaster hooks. New projects: use --pm instead.
 
 CODING RULES
@@ -191,6 +196,7 @@ UPDATE_ONLY=false
 MODEL_PICK=false
 FORCE_MODELS=false
 GRAPHIFY=false
+GRAPHIFY_REMOVE=false
 UI=false
 UI_REFRESH=false
 USAGE_MODE=false
@@ -214,6 +220,7 @@ while [ $# -gt 0 ]; do
         --update) UPDATE_ONLY=true ;;
         --models) FORCE_MODELS=true ;;
         --graphify) GRAPHIFY=true ;;
+        --graphify-remove) GRAPHIFY_REMOVE=true ;;
         --ui) UI=true ;;
         --pm) PM=true ;;
         --ui-refresh) UI_REFRESH=true ;;
@@ -329,6 +336,43 @@ if [ "$USAGE_MODE" = true ]; then
     echo "          project path only. Transcripts are pruned by Claude Code's"
     echo "          retention setting, and worktree/headless sessions log under"
     echo "          their own paths -- treat numbers as a floor, not exact."
+    exit 0
+fi
+
+remove_graphify() {
+    echo "[graphify-remove] $TARGET"
+    if command -v graphify >/dev/null 2>&1; then
+        # --project keeps graphify's user-global skill untouched; the bare
+        # "graphify claude uninstall" would delete that too.
+        (cd "$TARGET" && graphify uninstall --project --platform claude 2>&1 | sed 's/^/  /') \
+            || echo "  [warn] graphify uninstall --project --platform claude failed"
+        (cd "$TARGET" && graphify hook uninstall 2>&1 | sed 's/^/  /') \
+            || echo "  [warn] graphify hook uninstall failed"
+    else
+        echo "  [manual] graphify CLI not found, so remove these by hand:"
+        echo "    - .claude/skills/graphify/"
+        echo "    - the '## graphify' section in CLAUDE.md"
+        echo "    - hooks whose command mentions graphify in .claude/settings.json"
+        echo "    - blocks between '# graphify-...-start' and '-end' in .git/hooks/post-*"
+    fi
+    local out="$TARGET/graphify-out"
+    if [ -d "$out" ]; then
+        local size; size="$(du -sh "$out" 2>/dev/null | cut -f1)"
+        if [ -t 0 ]; then
+            printf "  Delete graphify-out/ (%s, generated data only)? [y/N] " "$size"
+            read -r ans || ans=""
+            case "$ans" in
+                y|Y|yes|YES) rm -rf "$out" && echo "  [removed] graphify-out/ ($size)" ;;
+                *) echo "  [keep] graphify-out/ ($size)" ;;
+            esac
+        else
+            echo "  [keep] graphify-out/ ($size) -- delete it yourself if unused"
+        fi
+    fi
+}
+
+if [ "$GRAPHIFY_REMOVE" = true ]; then
+    remove_graphify
     exit 0
 fi
 
@@ -815,24 +859,14 @@ install_graphify() {
     echo "  Build the graph once from inside Claude Code with: /graphify ."
 }
 
-if [ "$UPDATE_ONLY" != true ]; then
-    if [ "$GRAPHIFY" = true ]; then
-        echo ""
-        echo "[graphify]"
-        install_graphify
-    elif [ -t 0 ] && [ "$MODEL_PICK" = true ] && [ ! -d "$DEST/skills/graphify" ]; then
-        echo ""
-        echo "[graphify] Optional: index this codebase into a local knowledge graph so"
-        echo "           Claude navigates via graph queries instead of reading files"
-        echo "           broadly (big token savings on larger projects, ~500+ files;"
-        echo "           NOT worth it on small ones)."
-        printf "Set up Graphify for this project? [y/N] "
-        read -r ans || ans=""
-        case "$ans" in
-            y|Y|yes|YES) install_graphify ;;
-            *) ;;
-        esac
-    fi
+# Graphify is opt-in only. It used to be offered on first install, but on
+# a real project its hook nudged 583 times with zero graph queries, grep
+# answered 6 of 7 relation questions better, and graphify-out/ grew to
+# 411 MB -- so blackcat no longer suggests it.
+if [ "$UPDATE_ONLY" != true ] && [ "$GRAPHIFY" = true ]; then
+    echo ""
+    echo "[graphify] experimental -- see blackcat --help before relying on it"
+    install_graphify
 fi
 
 # ------------------------------------------------------------------- ui ----

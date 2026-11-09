@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.10.6**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.11.1**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -53,7 +53,8 @@ blackcat --pm         :: 加裝專案管理包（WBS、/task-next、自動時間
 blackcat --taskmaster :: 加裝 TaskMaster
 blackcat --update     :: 純更新模式：blackcat repo 更新後，刷新專案裡已裝且有變動的項目
 blackcat --usage      :: 用量統計：這個專案的 skills/commands/agents 各用過幾次、哪些裝了沒用過（別名 --skill-freq）
-blackcat --graphify   :: 加裝 Graphify 知識圖譜（省 token；需先裝 graphify CLI）
+blackcat --graphify   :: 加裝 Graphify 知識圖譜（實驗性，實測沒幫助，見下方說明）
+blackcat --graphify-remove :: 從專案拆掉 Graphify
 bcd                   :: 並行任務調度（blackcat-dispatch 的短別名；Claude Code 裡用 /dispatch）
 blackcat --help       :: 每個選項的說明（英文，Windows 主控台顯示中文會亂碼）
 blackcat --list       :: 列出所有可單獨挑選的項目名稱
@@ -251,22 +252,23 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 **安全設計**：任務由 /plan 匯出時強制檔案不重疊、內容自足（headless session 沒有對話上下文）；每個 session 只寫自己的 `.claude/worklog.d/<slug>.md`（合併不衝突）；只 commit 不 push 不 merge；失敗的任務留 log 在 `.claude/dispatch-logs/`。
 
-### Graphify（省 token 選配）
+### Graphify（實驗性，預設不建議）
 
-[Graphify](https://github.com/Graphify-Labs/graphify) 用 tree-sitter 在本地把程式碼解析成可查詢的知識圖譜（不打 API），之後 Claude 沿圖找到相關檔案再精準讀取，不用大範圍翻檔案定位——**大型專案（約 500+ 檔案）省最多，小專案建圖成本反而高於節省**，所以是選配不進 preset。
+[Graphify](https://github.com/Graphify-Labs/graphify) 把程式碼解析成知識圖譜，再用 hook 提醒 Claude「先查圖、別翻檔案」。理論上能省 token，**實測在一個 Java＋Vue 的專案上沒有幫助**：
 
-- 前置：`uv tool install graphifyy`（或 `pipx install graphifyy`；PyPI 套件名是雙 y）。
-- 裝法：專案**首次**安裝的互動流程會問一次要不要裝；或隨時 `blackcat --graphify`。
-- **關鍵：完整接線有三層，只裝 skill 是不會省到 token 的**（Claude 不會自動查圖，照樣翻檔案）。blackcat 會三層都裝：
+| 項目 | 結果 |
+|:--|:--|
+| hook 提醒「改用圖查詢」 | 583 次，換來 0 次查詢（提醒不擋，Claude 一律照用 grep） |
+| 7 題「誰呼叫誰、哪裡寫入」的實際問題 | grep 6 題比較準；graphify 只有 1 題表現較好，那題還列出一條錯的呼叫關係 |
+| 速度 | grep 0.2～0.6 秒，graphify 0.8～1 秒 |
+| 抓不到的關係 | 前端 → BFF → 後端靠 HTTP 路徑字串串接，圖上斷掉；`.xml`（MyBatis）、`.sql`、`.ftl` 沒有節點 |
+| 雜訊 | 10,186 個節點有 30% 來自 `.claude/` 的舊計畫與文件 |
+| 成本 | 每次 commit 都重建圖，`graphify-out/` 累積到 411 MB |
 
-| 層 | 指令 | 作用 |
-|:--|:--|:--|
-| skill | `graphify install --project` | 手動 `/graphify` 查詢能力 |
-| **graph-first** | `graphify claude install` | CLAUDE.md 指示 + PreToolUse hook，在搜尋類工具呼叫前把 Claude 推向圖查詢——**這層才是自動省 token 的來源**（還有 strict 模式可強制） |
-| 自動重建 | `graphify hook install` | git post-commit/checkout hook 增量重建（只重解析變動檔案），**不用手動更新圖** |
+所以 blackcat 不再在首次安裝時詢問，只保留明確指定：
 
-- 裝完在 Claude Code 裡跑一次 `/graphify .` 建圖（產出 `graph.json` / `GRAPH_REPORT.md` / `graph.html`）。之後圖靠 git hook 在每次 commit 自動增量更新；沒裝 hook 的話手動 `graphify update .`。
-- 它建立的 `.claude/skills/graphify` 歸 graphify CLI 管——blackcat 的清理與更新機制**刻意不碰**非本 repo 的 skills，互不干擾。
+- `blackcat --graphify`：裝上（需先 `uv tool install graphifyy`）。只建議用在**超大、單一語言、靠 import 串起來**的程式庫，裝完過一兩週用 `blackcat --usage` 看實際有沒有被查詢。
+- `blackcat --graphify-remove`：拆掉。呼叫 graphify 自己的移除指令（只限這個專案，不動全域），移掉 skill、CLAUDE.md 的 graphify 段落、settings.json 的 hook、git 的 post-commit／post-checkout 區段；`graphify-out/` 會先告訴你大小，問過才刪。
 
 ### 專案管理：`--pm`
 
@@ -502,7 +504,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 - [Raymondhou0917/speak-human-tw](https://github.com/Raymondhou0917/speak-human-tw)（MIT，已收錄）
 - [blader/humanizer](https://github.com/blader/humanizer)（MIT，已收錄）
 - [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code)
-- [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify)（選配整合）
+- [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify)（實驗性選配，預設不建議）
 - [pencil.dev](https://pencil.dev)（選配整合）
 
 ---
@@ -511,6 +513,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.11.1** | 2026-11-09 | Graphify 降為實驗性：不再於首次安裝時詢問（實測 583 次提醒 0 次查詢、grep 較準、graphify-out 411 MB）；新增 `blackcat --graphify-remove` 從專案乾淨拆掉（skill、CLAUDE.md 段落、hook、git hook，graphify-out 問過才刪） |
 | **v26.10.6** | 2026-10-29 | 新增全域命名規則 `naming-style.md`（命名表先確認、詞性、角色後綴、禁用字、改名程序、回報附中文），install.bat 自動加進全域 CLAUDE.md；/plan 附命名表、/review-code 檢查命名、/go 快車道回報附命名表 |
 | **v26.10.5** | 2026-10-29 | 新增 `/ui-add <網址>`：把喜歡的網站收進風格庫（Playwright 抽取腳本、截圖確認、寫成 `ui-library/my-<代號>/`、登記 CATALOG「我的收藏」）；`install.bat` 記下 repo 路徑到 `~/.claude/blackcat-repo`；`_sources.json` 授權路徑改正 |
 | **v26.10.4** | 2026-10-29 | /ui-style 寫完設定後產風格樣張 `.claude/ui/preview.html` 並用瀏覽器打開，確認才定案；看預覽選方向時可先看三個方向的實際畫面；新增 `/ui-style --preview` 只重產樣張 |
