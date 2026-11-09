@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.11.1**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.11.2**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -513,6 +513,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.11.2** | 2026-11-09 | 修 `scripts/check-counts.sh` 從未進版控（`.gitignore` 早期的 `scripts/` 規則擋掉，環境重開就消失）：規則改成只擋根目錄的 ECC 資料夾，腳本重建並加一項檢查「README 指到的檔案不能被 gitignore」 |
 | **v26.11.1** | 2026-11-09 | Graphify 降為實驗性：不再於首次安裝時詢問（實測 583 次提醒 0 次查詢、grep 較準、graphify-out 411 MB）；新增 `blackcat --graphify-remove` 從專案乾淨拆掉（skill、CLAUDE.md 段落、hook、git hook，graphify-out 問過才刪） |
 | **v26.10.6** | 2026-10-29 | 新增全域命名規則 `naming-style.md`（命名表先確認、詞性、角色後綴、禁用字、改名程序、回報附中文），install.bat 自動加進全域 CLAUDE.md；/plan 附命名表、/review-code 檢查命名、/go 快車道回報附命名表 |
 | **v26.10.5** | 2026-10-29 | 新增 `/ui-add <網址>`：把喜歡的網站收進風格庫（Playwright 抽取腳本、截圖確認、寫成 `ui-library/my-<代號>/`、登記 CATALOG「我的收藏」）；`install.bat` 記下 repo 路徑到 `~/.claude/blackcat-repo`；`_sources.json` 授權路徑改正 |

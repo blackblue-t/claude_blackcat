@@ -16,10 +16,9 @@ file-history/
 stats-cache.json
 mcp-needs-auth-cache.json
 
-# ECC plugin（太大，需另外安裝）
-plugins/
-ecc/
-scripts/
+# ECC plugin（太大，需另外安裝）。只擋根目錄：scripts/ 放本 repo 自己的檢查腳本，要進版控
+/plugins/
+/ecc/
 
 # 二進位檔
 *.exe
