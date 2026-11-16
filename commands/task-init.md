@@ -1,6 +1,6 @@
 ---
 description: 專案管理第一站：收斂需求後拆出 WBS（里程碑、任務、依賴、預估），寫進 .claude/taskmaster-data/wbs.md。之後用 /task-next 一個一個做。
-model: claude-fable-5
+model: fable
 ---
 <!-- 模型路由：拆解與估時是推理工作，跟 /plan 同級。要降級改 model: 即可。 -->
 

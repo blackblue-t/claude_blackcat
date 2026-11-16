@@ -534,26 +534,27 @@ if [ "$UPDATE_ONLY" != true ]; then
 fi
 
 # --------------------------------------------------------------- models ----
-# First-install model picker: probe whether claude-fable-5 is usable, then
+# First-install model picker: probe whether the fable alias is usable, then
 # ask which model each stage should run on. Choices are written into THIS
 # project's command copies (and optionally .claude/settings.json), so every
 # project can route differently. Re-runs skip it (files already existed);
 # re-open it any time with --models. Non-interactive runs keep the repo
-# defaults (plan/review: claude-fable-5, commit: sonnet).
+# defaults (plan/review: fable, commit: sonnet). Aliases, not pinned ids:
+# a pinned id goes stale (claude-fable-5 costs more than its successor).
 
 probe_fable() {
     command -v claude >/dev/null 2>&1 || return 2
     if command -v timeout >/dev/null 2>&1; then
-        timeout 45 claude --model claude-fable-5 -p "ok" >/dev/null 2>&1
+        timeout 45 claude --model fable -p "ok" >/dev/null 2>&1
     else
-        claude --model claude-fable-5 -p "ok" >/dev/null 2>&1
+        claude --model fable -p "ok" >/dev/null 2>&1
     fi
 }
 
 model_from_choice() { # $1=answer $2=default
     case "$1" in
         "") echo "$2" ;;
-        1)  echo "claude-fable-5" ;;
+        1)  echo "fable" ;;
         2)  echo "opus" ;;
         3)  echo "sonnet" ;;
         4)  echo "haiku" ;;
@@ -617,14 +618,14 @@ if [ "$UPDATE_ONLY" != true ] && [ -t 0 ] && { [ "$MODEL_PICK" = true ] || [ "$F
         case "$(cmd_model "$n")" in *fable*) NEEDS_FABLE=true ;; esac
     done
     if [ "$NEEDS_FABLE" = true ]; then
-        printf "  Probing claude-fable-5 (one tiny API call via claude CLI)... "
+        printf "  Probing fable (one tiny API call via claude CLI)... "
         if probe_fable; then
             echo "available"
         elif [ $? -eq 2 ]; then
             echo "unknown (claude CLI not found)"
         else
             echo "NOT available"
-            printf "  Downgrade every claude-fable-5 route to opus? [Y/n] "
+            printf "  Downgrade every fable route to opus? [Y/n] "
             read -r a || a=""
             case "$a" in
                 n|N|no|NO) ;;
@@ -651,7 +652,7 @@ if [ "$UPDATE_ONLY" != true ] && [ -t 0 ] && { [ "$MODEL_PICK" = true ] || [ "$F
     printf "  Change which? (numbers separated by spaces, Enter = keep all): "
     read -r sel || sel=""
     if [ -n "$sel" ]; then
-        echo "  Choices: 1=claude-fable-5  2=opus  3=sonnet  4=haiku"
+        echo "  Choices: 1=fable  2=opus  3=sonnet  4=haiku"
         echo "  (Enter keeps current; or type a full model id)"
         for num in $sel; do
             if [ "$num" = "$MAIN_IDX" ]; then
@@ -1029,6 +1030,19 @@ if [ "$TASKMASTER" = true ]; then
         echo "  [keep] settings.json (already exists -- merge TaskMaster hooks manually)"
     fi
 fi
+
+# Commands installed before v26.11.3 pinned "model: claude-fable-5". That id
+# is the first Fable release: it is dearer than the current one and never
+# moves forward. Rewrite exactly that value to the alias (any other model a
+# project chose is left alone). The update check ignores model lines, so
+# without this the stale id would survive every --update.
+for f in "$DEST"/commands/*.md; do
+    [ -f "$f" ] || continue
+    if grep -q '^model: claude-fable-5[[:space:]]*$' "$f"; then
+        sed -i 's/^model: claude-fable-5[[:space:]]*$/model: fable/' "$f"
+        echo "[model] $(basename "$f" .md): claude-fable-5 -> fable (alias follows the latest Fable)"
+    fi
+done
 
 # Hallmark was fetched by --ui up to v26.10.2. Its rules clash with the
 # chosen brand style and duplicate anti-ai.md, so it is retired: move the

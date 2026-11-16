@@ -1,6 +1,6 @@
 ---
 description: 文件先行：依 scope 產出 PRD（mvp）或 PRD + BDD 規格（full），規格先於任務拆解、防範疇蔓延。demo 級不需要本指令。
-model: claude-fable-5
+model: fable
 ---
 <!-- 模型路由：規格是規劃層工作，用 Fable 5。降級改 model: 即可。 -->
 

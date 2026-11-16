@@ -1,6 +1,6 @@
 # claude_blackcat
 
-**版本：v26.11.2**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.11.3**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
 個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
 
@@ -83,7 +83,7 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 三段分工：**規劃/審查用 Fable 5、執行用 Opus、機械收尾用 Sonnet**。
 
-**初始化精靈**：專案**第一次**安裝時（模型路由指令剛被複製進去），安裝器會自動跑模型設定精靈——先用 claude CLI 探測 `claude-fable-5` 是否可用（一次極小的 API 呼叫；不可用時 plan/review 預設自動降為 opus），然後逐階段詢問 plan / review / commit / 主迴圈各用哪個模型（Enter 保留預設、可輸入 1-4 或完整模型 ID）。選擇寫進**該專案的**指令副本與 `.claude/settings.json`，所以每個專案可以路由不同。重跑不會再問；想改用 `blackcat --models` 重開精靈。專案自選的模型受更新機制保護：比對時忽略 model 行、更新時保留專案的選擇。
+**初始化精靈**：專案**第一次**安裝時（模型路由指令剛被複製進去），安裝器會自動跑模型設定精靈——先用 claude CLI 探測 `fable` 是否可用（一次極小的 API 呼叫；不可用時 plan/review 預設自動降為 opus），然後逐階段詢問 plan / review / commit / 主迴圈各用哪個模型（Enter 保留預設、可輸入 1-4 或完整模型 ID）。選擇寫進**該專案的**指令副本與 `.claude/settings.json`，所以每個專案可以路由不同。重跑不會再問；想改用 `blackcat --models` 重開精靈。專案自選的模型受更新機制保護：比對時忽略 model 行、更新時保留專案的選擇。
 
 **什麼可以指定模型**（常見誤會：skill 不行）：
 
@@ -100,9 +100,9 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
   Current routing:
     1) /clean-plan   sonnet          6) /learn        sonnet
     2) /commit       sonnet          7) /merge        sonnet
-    3) /dispatch     sonnet          8) /plan         claude-fable-5
-    4) /grill-doc    claude-fable-5  9) /review-code  claude-fable-5
-    5) /grill        claude-fable-5 10) main loop     (inherits global)
+    3) /dispatch     sonnet          8) /plan         fable
+    4) /grill-doc    fable  9) /review-code  fable
+    5) /grill        fable 10) main loop     (inherits global)
   Change which? (numbers separated by spaces, Enter = keep all): 8 10
 ```
 
@@ -114,7 +114,7 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 執行 → 審查 → 提交靠 **worklog 接力**：執行時 worklog skill 把每個變更（動了哪些檔、做了什麼、驗證結果）追加到專案的 `.claude/worklog.md`；`/review-code` **只讀 worklog + 列出檔案的 git diff**（不掃全專案，Fable 的錢花在刀口上），結論寫回 worklog；`verdict: pass` 後 `/commit` 用 Sonnet 只 stage 紀錄過的檔案、寫 commit message、提交並歸檔 worklog。worklog skill 與 `/commit` 已加入 lean/strict 兩個 preset。
 
-> Fable 5 是 Opus 之上的模型級別、單價較高，所以只配給規劃與審查；用之前先在 CLI 打 `/model` 確認你的方案看得到 `claude-fable-5`，看不到就把兩個 frontmatter 降回 `opus`。
+> Fable 5 是 Opus 之上的模型級別、單價較高，所以只配給規劃與審查；用之前先在 CLI 打 `/model` 確認你的方案看得到 Fable，看不到就把兩個 frontmatter 降回 `opus`。
 >
 > **驗證路由是否生效**：別問模型「你是誰」——session 系統提示詞不隨斜線指令的 `model:` 更新，自報不可靠（實測結論）。要驗就用外部觀測：`/status`、API 用量紀錄，或 dispatcher stdout 的模型回顯（任務層 `model:` 已實測確證生效）。
 
@@ -513,6 +513,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.11.3** | 2026-11-16 | 模型路由改用別名 `fable`：原本寫死的 `claude-fable-5` 是第一代，比現行版本貴而且不會跟著升級；任何一次 `blackcat`（含 `--update`）會把專案裡的舊值改成別名，其他自選的模型不動 |
 | **v26.11.2** | 2026-11-09 | 修 `scripts/check-counts.sh` 從未進版控（`.gitignore` 早期的 `scripts/` 規則擋掉，環境重開就消失）：規則改成只擋根目錄的 ECC 資料夾，腳本重建並加一項檢查「README 指到的檔案不能被 gitignore」 |
 | **v26.11.1** | 2026-11-09 | Graphify 降為實驗性：不再於首次安裝時詢問（實測 583 次提醒 0 次查詢、grep 較準、graphify-out 411 MB）；新增 `blackcat --graphify-remove` 從專案乾淨拆掉（skill、CLAUDE.md 段落、hook、git hook，graphify-out 問過才刪） |
 | **v26.10.6** | 2026-10-29 | 新增全域命名規則 `naming-style.md`（命名表先確認、詞性、角色後綴、禁用字、改名程序、回報附中文），install.bat 自動加進全域 CLAUDE.md；/plan 附命名表、/review-code 檢查命名、/go 快車道回報附命名表 |

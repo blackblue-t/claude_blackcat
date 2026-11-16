@@ -1,6 +1,6 @@
 ---
 description: 需求拷問：連環追問直到需求沒有模糊地帶，產出需求文件餵給 /plan。流程的第一站。
-model: claude-fable-5
+model: fable
 ---
 <!-- 模型路由：拷問需求最吃推理，用 Fable 5。要降級改 model: 即可。總表見 README「模型路由」。 -->
 

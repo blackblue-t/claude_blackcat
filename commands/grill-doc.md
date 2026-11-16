@@ -1,6 +1,6 @@
 ---
 description: 拿現成文件來拷問並就地改寫：讀你的需求書/規格/設計文件，逐條追問模糊與矛盾，每談定一題就直接改進文件裡。用法 /grill-doc <檔案路徑>。
-model: claude-fable-5
+model: fable
 ---
 <!-- 模型路由：拷問與改寫文件最吃推理，用 Fable 5。降級改 model: 即可。 -->
 

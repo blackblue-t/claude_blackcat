@@ -1,6 +1,6 @@
 ---
 description: 審查 worklog 記錄的變更範圍（不掃全專案）：逐行審查交給內建 /code-review，另外補查測試品質、規格收斂、文件債，結論寫回 worklog，通過後交給 /commit。
-model: claude-fable-5
+model: fable
 ---
 <!-- 模型路由：審查用 Fable 5。要降級改這裡的 model: 即可，例如 model: opus。
      總表見 README「模型路由」。 -->
