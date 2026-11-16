@@ -13,9 +13,25 @@ description: 一條龍指令：需求 → 計畫（唯一人工關卡）→ 執�
 
 ## 階段
 
-### 0. 任務分級——先判要不要走全流程
+### -1. 開工前同步
 
-不是每個改動都值得五站流程。同時滿足以下三條 = **trivial，走快車道**：
+照 `sync.md` 的步驟 1、2 做一次（沒有遠端就跳過）。落後就先拉下來再開工；分岔或有衝突
+先處理完。這一步不做，做完才發現遠端早就有人改過同一個檔。
+
+### 0. 任務分級——先判等級，再決定走多重的流程
+
+等級決定流程多重、審查用多貴的模型。**判完用一句話告訴使用者**（「這是一般任務，
+審查用 /review-code」），使用者可以改。
+
+| 等級 | 判定 | 計畫 | 審查 |
+|:--|:--|:--|:--|
+| 快車道 | 下面三條同時滿足 | 不出計畫 | 自己看一次 diff，不開審查 session |
+| 一般（預設） | 其他都是 | 階段 1 | `/review-code`（opus，effort medium） |
+| 關鍵 | 動到任何一項：登入／權限、金流或金額計算、資料庫 schema 或資料遷移、刪除或覆寫使用者資料、對外 API 或檔案格式、加密與機密、並行與鎖；或使用者說「重要」「仔細審」 | 階段 1，計畫要寫回復方式 | `/review-deep`（fable，effort high） |
+
+拿不準是一般還是關鍵 → 當關鍵。等級只升不降：做到一半發現動到上面那些項目，升成關鍵。
+
+同時滿足以下三條 = **快車道**：
 
 - 純視覺 / 文案 / 樣式，或單一元件的小修改
 - 不動業務邏輯、不動資料結構、不動公開介面
@@ -75,10 +91,13 @@ description: 一條龍指令：需求 → 計畫（唯一人工關卡）→ 執�
 session，滿足修/審分離）：
 
 ```bash
-claude -p "/review-code" --dangerously-skip-permissions
+claude -p "/review-code" --dangerously-skip-permissions     # 一般任務
+claude -p "/review-deep" --dangerously-skip-permissions     # 關鍵任務
 ```
 
-- 模型由 review-code.md 的 frontmatter 決定，不用另指定。
+- 照階段 0 判的等級選指令。模型由各自的 frontmatter 決定，不用另指定。
+- 專案沒裝 `/review-deep`（舊安裝）→ 關鍵任務也用 `/review-code`，並在收尾報告提醒
+  跑 `blackcat --update` 補裝。
 - 跑完讀 `.claude/worklog.md` 最新的 `## Review (round N)` 條目取 verdict。
 - claude CLI 不可用時退回手動：請使用者開新 session 跑 /review-code，
   流程在此暫停。
@@ -87,25 +106,29 @@ claude -p "/review-code" --dangerously-skip-permissions
 
 - **pass** → 進階段 5。
 - **needs-fix**（全 `fix` 級）→ 本 session 修（記 `## Fix:` 條目），
-  再跑一次階段 3 的 headless 審查（限縮重審）。**上限 2 輪**，
+  再跑一次階段 3 的 headless 審查（限縮重審，跟第 1 輪同一個指令）。**上限 2 輪**，
   超過就停下交使用者裁決。
 - **escalate**（有 `design`/`requirement` 級）→ 停下，帶著 findings
   回報使用者：建議回 /plan 或 /grill，不自作主張改架構。
 
 ### 5. 提交準備
 
-照 `commit.md` 做（含並行路線的整合分支合併回 main）。**不 push。**
+照 `commit.md` 做（含並行路線的整合分支合併回 main），最後照 `commit.md` 的
+「同步與推送」處理：預設問一句要不要推，`.claude/blackcat.conf` 設 `PUSH=auto` 才直接推。
 
 ### 6. 收尾報告
 
-一段話總結：做了什麼、審查幾輪抓到什麼、commit hash、
-「請檢查 git log，滿意就 push」；並行路線提醒 `/dispatch --clean`。
+一段話總結：任務等級、做了什麼、審查幾輪抓到什麼、commit hash、推了沒有（沒推就寫
+還有幾個提交在本地）；並行路線提醒 `/dispatch --clean`。
+
+最後提醒一句：**下一個任務前先 `/clear`**。進度都在檔案裡（WBS、計畫、worklog 歸檔），
+不靠對話記憶；帶著上一個任務的整段對話做下一個，每一步都在為用不到的內容付費。
 
 ## 鐵則
 
 - 計畫確認前不寫任何檔案（plan.md 的規則，這裡再強調一次）。
 - 審查永遠在獨立 session（headless 或手動），絕不在本 session 自審。
 - 修復迴圈上限 2 輪，escalate 永遠停下——自動化不覆蓋人的裁決點。
-- 全程不 push、不動使用者沒同意的範圍。
+- 沒問過不 push（`PUSH=auto` 例外）、不動使用者沒同意的範圍。
 - 中途任何一站失敗（dispatcher 卡死、headless 起不來），停在原地
   說明狀況與手動續行方式，不硬闖。

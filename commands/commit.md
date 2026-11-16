@@ -32,7 +32,7 @@ staging、commit message、合併回主分支（並行路線）、歸檔——�
    風格（先看 `git log --oneline -5`）；預設 Conventional Commits
    （`feat:`/`fix:`/`refactor:`…），主旨一句話，body 列要點。
 4. **提交並確認**：`git commit` 後用 `git log -1 --stat` 確認內容。
-   **不推送**——push 由使用者決定。
+   推送留到步驟 7。
 5. **歸檔 worklog**：把 `.claude/worklog.md` 與 `.claude/worklog.d/*.md`
    （並行任務的紀錄，如果有）合併移到
    `.claude/worklog-archive/<YYYY-MM-DD>-<短描述>.md`（目錄不存在就建），
@@ -66,5 +66,11 @@ staging、commit message、合併回主分支（並行路線）、歸檔——�
      （--no-ff 保留「這批工作是一個整體」的歷史）。
    - 合併訊息引用計畫標題。衝突理論上不會有（整合分支從主分支出發），
      真遇到就停下請使用者裁決。
-   - 收尾提醒使用者：檢查 `git log` 沒問題就自行 push；並行路線再跑
-     `/dispatch --clean` 收掉 worktree 與任務分支。**不代替使用者 push。**
+   - 並行路線提醒跑 `/dispatch --clean` 收掉 worktree 與任務分支。
+
+7. **同步與推送**（有遠端時）：照 `sync.md` 做。
+   - 先 `git fetch`：遠端有新提交就照 `sync.md` 步驟 2 拉下來（本地提交還沒推過用
+     rebase），衝突停下協助解。
+   - 再看 `.claude/blackcat.conf` 的 `PUSH`：`ask`（預設）問一句「要推上遠端嗎？」；
+     `auto` 直接推；`never` 只提醒有幾個提交還沒推。
+   - 不用 `--force`。

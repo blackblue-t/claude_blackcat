@@ -51,7 +51,9 @@ model: sonnet
    b=".claude/session-board.md"
    if [ -f "$b" ]; then
        echo "[session-board] Roles for this project (survives /clear):"
-       cat "$b"
+       # Cap what goes into every session: the board is a notice, not a log.
+       head -n 40 "$b"
+       [ "$(wc -l < "$b")" -gt 40 ] && echo "(board is longer than 40 lines -- run /session who to prune stale entries)"
        echo "Rule: before editing files inside another session's files: scope, coordinate first."
        echo "If unsure which entry is THIS terminal, ask the user once."
    fi

@@ -1,8 +1,9 @@
 ---
 description: 審查 worklog 記錄的變更範圍（不掃全專案）：逐行審查交給內建 /code-review，另外補查測試品質、規格收斂、文件債，結論寫回 worklog，通過後交給 /commit。
-model: fable
+model: opus
 ---
-<!-- 模型路由：審查用 Fable 5。要降級改這裡的 model: 即可，例如 model: opus。
+<!-- 模型路由：一般任務的審查用 opus。每個任務都會跑一次審查，所以這裡是最大的重複花費，
+     不預設最貴的模型。關鍵任務（認證、金流、資料遷移…）改跑 /review-deep（fable）。
      總表見 README「模型路由」。 -->
 
 # 程式碼審查（worklog 範圍）
@@ -51,8 +52,9 @@ model: fable
 - 並行路線（已合進整合分支）：目標設成整合分支（branch target），
   基準是合併前的起點。
 - `$ARGUMENTS` 給了路徑：目標設成那個路徑。
-- 明確指定 effort：第 1 輪 `high`，限縮重審 `medium`。不指定的話它會
-  沿用使用者上次打的等級，結果不可預期。
+- 明確指定 effort：第 1 輪 `medium`，限縮重審 `low`（由 `/review-deep` 進來時各升一級：
+  `high`／`medium`）。不指定的話它會沿用使用者上次打的等級，結果不可預期。等級越高開的
+  審查子代理越多，花費是倍數成長，所以一般任務不用 `high`。
 - **不要加 `--fix`**：修的人和審的人要分開，修復由主 session 做。
   也不要加 `--comment`。
 

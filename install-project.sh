@@ -29,10 +29,10 @@
 # versions of this repo. Updating overwrites local edits to those files,
 # so commit the project's .claude/ first.
 #
-# --rules copies rule files into <project>/.claude/rules/ AND writes a marked
-# @-import block into the project's CLAUDE.md. Claude Code does NOT auto-load
-# rules directories -- files only reach the system prompt when CLAUDE.md
-# imports them, so the import block is what actually wires them up.
+# --rules copies rule files into <project>/.claude/rules/, which Claude Code
+# loads by itself: files without "paths:" frontmatter at launch, files with
+# it only when a matching file is touched. No CLAUDE.md import is written
+# (an import would load the same text a second time).
 #
 # When run interactively WITHOUT --rules, an interactive picker offers the
 # rule sets (with a one-line description each) after the main install.
@@ -64,9 +64,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # (plan on Fable -> execute on the session model writing .claude/worklog.md
 # -> review-code on Fable reads only that scope -> commit on sonnet).
 LEAN_SKILLS="ponytail ponytail-review worklog session-etiquette"
-LEAN_COMMANDS="go grill grill-ui grill-doc plan clean-plan dispatch merge review-code commit learn save-session session"
+LEAN_COMMANDS="go next sync grill grill-ui grill-doc plan clean-plan dispatch merge review-code review-deep commit learn save-session session"
 STRICT_SKILLS="tdd-workflow verification-loop worklog session-etiquette"
-STRICT_COMMANDS="go grill grill-ui grill-doc plan clean-plan spec dispatch merge tdd verify review-code commit learn save-session session"
+STRICT_COMMANDS="go next sync grill grill-ui grill-doc plan clean-plan spec dispatch merge tdd verify review-code review-deep commit learn save-session session"
 
 # Items renamed in this repo: "<old> <new>" pairs. When the new one installs,
 # the stale old copy is moved to backups so projects do not keep both.
@@ -148,7 +148,15 @@ MAINTENANCE
   --update         After 'git pull' of blackcat: refresh every installed
                    file that changed. Overwrites local edits, so commit
                    the project's .claude/ first.
-  --models         Choose again which model each step uses.
+  --models         Choose again which model each step uses, one by one.
+  --models save|balanced|max
+                   Set all of them at once. balanced (default): planning
+                   on fable, the per-task review on opus, deep review on
+                   fable. save: one step cheaper everywhere. max: all fable.
+  --doctor         Read-only report: what is loaded into every session and
+                   how big, files that keep growing, hooks, which model
+                   each command uses, git state. Start here when tokens
+                   run out fast.
   --ui-refresh     Re-download ui-ux-pro-max (old copy is backed up).
   --usage          How often each skill / command / agent was used here.
 
@@ -195,6 +203,8 @@ NO_RULES=false
 UPDATE_ONLY=false
 MODEL_PICK=false
 FORCE_MODELS=false
+MODEL_PROFILE=""
+DOCTOR=false
 GRAPHIFY=false
 GRAPHIFY_REMOVE=false
 UI=false
@@ -218,7 +228,9 @@ while [ $# -gt 0 ]; do
         --rules) RULES="${2//,/ }"; shift ;;
         --no-rules) NO_RULES=true ;;
         --update) UPDATE_ONLY=true ;;
-        --models) FORCE_MODELS=true ;;
+        --models) FORCE_MODELS=true
+            case "${2:-}" in save|balanced|max) MODEL_PROFILE="$2"; shift ;; esac ;;
+        --doctor) DOCTOR=true ;;
         --graphify) GRAPHIFY=true ;;
         --graphify-remove) GRAPHIFY_REMOVE=true ;;
         --ui) UI=true ;;
@@ -373,6 +385,237 @@ remove_graphify() {
 
 if [ "$GRAPHIFY_REMOVE" = true ]; then
     remove_graphify
+    exit 0
+fi
+
+cmd_model() { # $1=command basename -> current model, empty if none
+    local f="$DEST/commands/$1.md"
+    [ -f "$f" ] || return 0
+    awk '/^---$/{n++; next} n==1 && /^model:[[:space:]]/{sub(/^model:[[:space:]]*/,""); print; exit}' "$f"
+}
+
+set_cmd_model() { # $1=command basename $2=model
+    local f="$DEST/commands/$1.md"
+    [ -f "$f" ] || return 0
+    if [ -n "$(cmd_model "$1")" ]; then
+        # Only the FIRST model: line (frontmatter). Files like plan.md also
+        # contain a model: line inside an example block that must not change.
+        sed -i "0,/^model:[[:space:]].*/s//model: $2/" "$f"
+        echo "  [model] commands/$1 -> $2"
+    else
+        echo "  [note] commands/$1.md has no model: line -- edit it manually"
+    fi
+}
+
+set_main_model() { # $1=model
+    local sf="$DEST/settings.json"
+    if [ ! -f "$sf" ]; then
+        printf '{\n  "model": "%s"\n}\n' "$1" > "$sf"
+        echo "  [model] settings.json (created) -> $1"
+    elif grep -q '"model"' "$sf"; then
+        sed -i "s/\"model\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"model\": \"$1\"/" "$sf"
+        echo "  [model] settings.json -> $1"
+    elif command -v jq >/dev/null 2>&1 && jq --arg m "$1" '.model = $m' "$sf" > "$sf.tmp.$$"; then
+        mv "$sf.tmp.$$" "$sf"
+        echo "  [model] settings.json -> $1"
+    else
+        rm -f "$sf.tmp.$$"
+        echo "  [note] settings.json has no model key -- add \"model\": \"$1\" manually"
+    fi
+}
+
+# ---------------------------------------------------------- model profile ----
+# blackcat --models save|balanced|max : set every thinking route at once.
+#   one-off thinking = grill grill-doc spec task-init plan (run once per
+#                      feature or project)
+#   review-code      = runs after EVERY task, so it is the biggest repeat cost
+#   review-deep      = critical tasks only
+apply_model_profile() { # $1=save|balanced|max
+    local think review deep main=""
+    case "$1" in
+        max)      think=fable; review=fable;  deep=fable ;;
+        balanced) think=fable; review=opus;   deep=fable ;;
+        save)     think=opus;  review=sonnet; deep=opus; main=sonnet ;;
+    esac
+    echo "[models] profile: $1"
+    local n
+    for n in grill grill-doc spec task-init plan; do
+        [ -f "$DEST/commands/$n.md" ] && set_cmd_model "$n" "$think"
+    done
+    [ -f "$DEST/commands/review-code.md" ] && set_cmd_model review-code "$review"
+    [ -f "$DEST/commands/review-deep.md" ] && set_cmd_model review-deep "$deep"
+    if [ -n "$main" ]; then
+        set_main_model "$main"
+    elif grep -q '"model"[[:space:]]*:[[:space:]]*"sonnet"' "$DEST/settings.json" 2>/dev/null; then
+        # undo what the save profile set
+        set_main_model opus
+    else
+        echo "  [keep] main loop model (change it with: blackcat --models)"
+    fi
+    echo "  Price per million tokens, input/output (2026-11): fable 8/40, opus 4/20, sonnet 2/10 USD"
+}
+
+if [ -n "$MODEL_PROFILE" ]; then
+    if [ ! -d "$DEST/commands" ]; then
+        echo "[error] no .claude/commands here -- install a preset first (blackcat --lean)"; exit 1
+    fi
+    apply_model_profile "$MODEL_PROFILE"
+    exit 0
+fi
+
+# ----------------------------------------------------------------- doctor ----
+# blackcat --doctor : read-only report of what costs tokens in this project.
+# Sizes are bytes; 1 KB of mixed Chinese/English text is very roughly 300-400
+# tokens, paid again in every new session (and after every /clear).
+doctor_size() { [ -f "$1" ] && wc -c < "$1" | tr -d ' ' || echo 0; }
+doctor_lines() { [ -f "$1" ] && wc -l < "$1" | tr -d ' ' || echo 0; }
+doctor_name() { # shorten a path for display
+    case "$1" in
+        "$TARGET"/*) echo "${1#"$TARGET"/}" ;;
+        "$HOME"/*)   echo "~/${1#"$HOME"/}" ;;
+        *)           echo "$1" ;;
+    esac
+}
+doctor_row() { # $1=label $2=bytes $3=lines $4=warn-bytes
+    local flag=""
+    [ "$2" -gt "$4" ] && flag="  <-- large"
+    [ "$2" -gt 0 ] && printf "  %-46s %7s B %5s lines%s\n" "$1" "$2" "$3" "$flag"
+}
+doctor_imports() { # print @imports of a CLAUDE.md, one path per line, ~ expanded
+    [ -f "$1" ] || return 0
+    grep -o '^@[^[:space:]]*' "$1" 2>/dev/null | sed 's/^@//' | while read -r imp; do
+        case "$imp" in
+            "~/"*) echo "$HOME/${imp#\~/}" ;;
+            /*)    echo "$imp" ;;
+            *)     echo "$(dirname "$1")/$imp" ;;
+        esac
+    done
+}
+run_doctor() {
+    echo "blackcat doctor: $TARGET"
+    echo ""
+    echo "[1] Loaded into EVERY new session (also after /clear)"
+    local total=0 f sz
+    for f in "$HOME/.claude/CLAUDE.md" "$TARGET/CLAUDE.md" "$TARGET/CLAUDE.local.md" "$DEST/CLAUDE.md"; do
+        [ -f "$f" ] || continue
+        sz=$(doctor_size "$f"); total=$((total+sz))
+        doctor_row "$(doctor_name "$f")" "$sz" "$(doctor_lines "$f")" 8000
+        doctor_imports "$f" | while read -r imp; do
+            [ -f "$imp" ] && doctor_row "  import $(doctor_name "$imp")" "$(doctor_size "$imp")" "$(doctor_lines "$imp")" 6000
+        done
+        for imp in $(doctor_imports "$f"); do [ -f "$imp" ] && total=$((total+$(doctor_size "$imp"))); done
+    done
+    # .claude/rules: files without "paths:" load at launch, the rest on demand.
+    local rl=0 rn=0 rs=0 rsn=0
+    for f in "$DEST"/rules/*.md "$DEST"/rules/*/*.md; do
+        [ -f "$f" ] || continue
+        if head -5 "$f" | grep -q '^paths:'; then rs=$((rs+$(doctor_size "$f"))); rsn=$((rsn+1))
+        else rl=$((rl+$(doctor_size "$f"))); rn=$((rn+1)); fi
+    done
+    [ "$rn" -gt 0 ] && printf "  %-46s %7s B  (%s files)%s\n" ".claude/rules (no paths: -> always loaded)" "$rl" "$rn" "$([ "$rl" -gt 8000 ] && echo '  <-- large')"
+    [ "$rsn" -gt 0 ] && printf "  %-46s %7s B  (%s files, only when a matching file is touched)\n" ".claude/rules (path-scoped, not counted)" "$rs" "$rsn"
+    total=$((total+rl))
+    grep -qF '<!-- blackcat:rules -->' "$TARGET/CLAUDE.md" 2>/dev/null \
+        && echo "      CLAUDE.md still @-imports .claude/rules: loaded twice. Run blackcat --update to remove the block."
+    # Claude Code auto memory: only the head of MEMORY.md is loaded.
+    local enc mem
+    enc="$(printf '%s' "$TARGET" | sed 's|[^A-Za-z0-9]|-|g')"
+    mem="$HOME/.claude/projects/$enc/memory/MEMORY.md"
+    if [ -f "$mem" ]; then
+        sz=$(doctor_size "$mem"); total=$((total+sz))
+        doctor_row "auto memory MEMORY.md" "$sz" "$(doctor_lines "$mem")" 20000
+        [ "$(doctor_lines "$mem")" -gt 200 ] && echo "      over 200 lines: Claude Code loads only the first part; move detail into topic files"
+        echo "      folder: ${mem%/MEMORY.md}  ($(ls "${mem%/MEMORY.md}" 2>/dev/null | wc -l | tr -d ' ') files; edit with /memory)"
+    fi
+    if [ -f "$DEST/session-board.md" ] && grep -q "load-session-board" "$DEST/settings.json" 2>/dev/null; then
+        sz=$(doctor_size "$DEST/session-board.md"); total=$((total+sz))
+        doctor_row ".claude/session-board.md (hook)" "$sz" "$(doctor_lines "$DEST/session-board.md")" 3000
+    fi
+    local nsk=0 ncm=0 nag=0 dsc=0
+    for f in "$DEST"/skills/*/SKILL.md; do [ -f "$f" ] || continue; nsk=$((nsk+1)); dsc=$((dsc+$(grep -m1 '^description:' "$f" | wc -c))); done
+    for f in "$DEST"/commands/*.md; do [ -f "$f" ] || continue; ncm=$((ncm+1)); dsc=$((dsc+$(grep -m1 '^description:' "$f" | wc -c))); done
+    for f in "$DEST"/agents/*.md; do [ -f "$f" ] || continue; nag=$((nag+1)); dsc=$((dsc+$(grep -m1 '^description:' "$f" | wc -c))); done
+    total=$((total+dsc))
+    printf "  %-46s %7s B  (%s skills, %s commands, %s agents)\n" "descriptions of installed items" "$dsc" "$nsk" "$ncm" "$nag"
+    if [ -f "$TARGET/.mcp.json" ]; then
+        local nm; nm=$(grep -c '"command"\|"url"' "$TARGET/.mcp.json" 2>/dev/null || true)
+        echo "  .mcp.json: about $nm server(s) -- every connected server adds its tool list to each session"
+        grep -q '"memory"' "$TARGET/.mcp.json" && echo "      'memory' server: keeps everything in ONE json file and can dump all of it into context; remove it if unused"
+        grep -q '"sequential-thinking"' "$TARGET/.mcp.json" && echo "      'sequential-thinking' server: little gain on current models; remove it to save tokens"
+    fi
+    printf "  %-46s %7s B  (roughly %s tokens per new session)\n" "TOTAL (files above)" "$total" "$((total/3))"
+    [ "$total" -gt 40000 ] && echo "  => heavy. Trim CLAUDE.md / MEMORY.md, uninstall unused skills (blackcat --usage shows which)."
+
+    echo ""
+    echo "[2] Files that grow (read on demand, but they bloat if never archived)"
+    local wl; wl=$(doctor_lines "$DEST/worklog.md")
+    [ "$wl" -gt 0 ] && printf "  %-46s %5s lines%s\n" ".claude/worklog.md" "$wl" "$([ "$wl" -gt 150 ] && echo '  <-- review + /commit to archive it')"
+    local ns; ns=$(ls "$DEST"/sessions/*.md 2>/dev/null | wc -l | tr -d ' ')
+    [ "$ns" -gt 0 ] && printf "  %-46s %5s files%s\n" ".claude/sessions/" "$ns" "$([ "$ns" -gt 10 ] && echo '  <-- keep 10, move older to sessions/archive/')"
+    local nl; nl=$(ls "$DEST"/learned/*.md 2>/dev/null | grep -vc '_TEMPLATE\|README' || true)
+    [ "$nl" -gt 0 ] && printf "  %-46s %5s files%s\n" ".claude/learned/" "$nl" "$([ "$nl" -gt 30 ] && echo '  <-- merge duplicates with /learn')"
+    local np; np=$(grep -l '^status: active' "$DEST"/plans/*.md 2>/dev/null | wc -l | tr -d ' ')
+    [ "$np" -gt 0 ] && printf "  %-46s %5s active%s\n" ".claude/plans/" "$np" "$([ "$np" -gt 3 ] && echo '  <-- /clean-plan')"
+    local wbs="$DEST/taskmaster-data/wbs.md"
+    if [ -f "$wbs" ]; then
+        local rows; rows=$(grep -c '^| *[0-9][0-9]*\.[0-9]' "$wbs" || true)
+        printf "  %-46s %5s tasks%s\n" "WBS" "$rows" "$([ "$rows" -gt 40 ] && echo '  <-- archive finished milestones (/task-status)')"
+    fi
+    [ -d "$TARGET/graphify-out" ] && echo "  graphify-out/  $(du -sh "$TARGET/graphify-out" 2>/dev/null | cut -f1)  <-- measured as not worth it: blackcat --graphify-remove"
+
+    echo ""
+    echo "[3] Hooks (each one runs on every matching event)"
+    if [ -f "$DEST/settings.json" ] && command -v jq >/dev/null 2>&1; then
+        jq -r '.hooks // {} | to_entries[] | .key as $e | .value[]? | "  \($e) [\(.matcher // "*")] \(.hooks[]?.command)"' "$DEST/settings.json" 2>/dev/null | cut -c1-110 || true
+        grep -q 'graphify' "$DEST/settings.json" && echo "  => graphify hooks fire on every Read/Grep/Bash and add a reminder each time: blackcat --graphify-remove"
+    else
+        echo "  (no .claude/settings.json, or jq missing)"
+    fi
+
+    echo ""
+    echo "[4] Which model each command runs on"
+    local main; main="$(grep -o '"model"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEST/settings.json" 2>/dev/null | sed 's/.*"\([^"]*\)"$/\1/')"
+    [ -n "$main" ] || main="$(grep -o '"model"[[:space:]]*:[[:space:]]*"[^"]*"' "$HOME/.claude/settings.json" 2>/dev/null | sed 's/.*"\([^"]*\)"$/\1/')"
+    echo "  main loop: ${main:-"(Claude Code default)"}   <- every command marked (main) below runs on this"
+    local line="" n m
+    for f in "$DEST"/commands/*.md; do
+        [ -f "$f" ] || continue
+        n="$(basename "$f" .md)"; m="$(cmd_model "$n")"
+        printf "  /%-14s %s\n" "$n" "${m:-(main)}"
+    done | sort -k2 | awk '{printf "%-34s", $0; if (NR%2==0) printf "\n"} END {if (NR%2) printf "\n"}'
+    grep -l '^model: claude-fable-5[[:space:]]*$' "$DEST"/commands/*.md >/dev/null 2>&1 \
+        && echo "  => some commands pin claude-fable-5 (old, dearer): run blackcat --update"
+    [ "$(cmd_model review-code)" = "fable" ] \
+        && echo "  => /review-code runs after EVERY task and is on fable. Default is now opus;" \
+        && echo "     /review-deep (fable) covers critical tasks. One step: blackcat --models balanced"
+    echo "  Profiles: blackcat --models save | balanced | max     Pick one by one: blackcat --models"
+
+    echo ""
+    echo "[5] Git"
+    if git -C "$TARGET" rev-parse --git-dir >/dev/null 2>&1; then
+        local br up cnt
+        br="$(git -C "$TARGET" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+        up="$(git -C "$TARGET" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+        echo "  branch: $br   uncommitted files: $(git -C "$TARGET" status --short 2>/dev/null | wc -l | tr -d ' ')"
+        if [ -n "$up" ]; then
+            cnt="$(git -C "$TARGET" rev-list --left-right --count "$up...HEAD" 2>/dev/null || true)"
+            echo "  vs $up (as of last fetch): behind $(echo "$cnt" | cut -f1), ahead $(echo "$cnt" | cut -f2)   -> /sync"
+        elif [ -n "$(git -C "$TARGET" remote 2>/dev/null)" ]; then
+            echo "  this branch has no upstream yet   -> /sync push"
+        else
+            echo "  no remote configured"
+        fi
+        local wt; wt=$(git -C "$TARGET" worktree list 2>/dev/null | wc -l | tr -d ' ')
+        [ "$wt" -gt 1 ] && echo "  worktrees: $wt   (finished dispatch runs: bcd --clean)"
+        local ib; ib=$(git -C "$TARGET" branch --list 'integrate/*' 'task/*' 2>/dev/null | wc -l | tr -d ' ')
+        [ "$ib" -gt 0 ] && echo "  leftover integrate/* and task/* branches: $ib   (bcd --clean removes merged ones)"
+    else
+        echo "  not a git repository"
+    fi
+}
+
+if [ "$DOCTOR" = true ]; then
+    run_doctor
     exit 0
 fi
 
@@ -562,42 +805,6 @@ model_from_choice() { # $1=answer $2=default
     esac
 }
 
-cmd_model() { # $1=command basename -> current model, empty if none
-    local f="$DEST/commands/$1.md"
-    [ -f "$f" ] || return 0
-    awk '/^---$/{n++; next} n==1 && /^model:[[:space:]]/{sub(/^model:[[:space:]]*/,""); print; exit}' "$f"
-}
-
-set_cmd_model() { # $1=command basename $2=model
-    local f="$DEST/commands/$1.md"
-    [ -f "$f" ] || return 0
-    if [ -n "$(cmd_model "$1")" ]; then
-        # Only the FIRST model: line (frontmatter). Files like plan.md also
-        # contain a model: line inside an example block that must not change.
-        sed -i "0,/^model:[[:space:]].*/s//model: $2/" "$f"
-        echo "  [model] commands/$1 -> $2"
-    else
-        echo "  [note] commands/$1.md has no model: line -- edit it manually"
-    fi
-}
-
-set_main_model() { # $1=model
-    local sf="$DEST/settings.json"
-    if [ ! -f "$sf" ]; then
-        printf '{\n  "model": "%s"\n}\n' "$1" > "$sf"
-        echo "  [model] settings.json (created) -> $1"
-    elif grep -q '"model"' "$sf"; then
-        sed -i "s/\"model\"[[:space:]]*:[[:space:]]*\"[^\"]*\"/\"model\": \"$1\"/" "$sf"
-        echo "  [model] settings.json -> $1"
-    elif command -v jq >/dev/null 2>&1 && jq --arg m "$1" '.model = $m' "$sf" > "$sf.tmp.$$"; then
-        mv "$sf.tmp.$$" "$sf"
-        echo "  [model] settings.json -> $1"
-    else
-        rm -f "$sf.tmp.$$"
-        echo "  [note] settings.json has no model key -- add \"model\": \"$1\" manually"
-    fi
-}
-
 if [ "$UPDATE_ONLY" != true ] && [ -t 0 ] && { [ "$MODEL_PICK" = true ] || [ "$FORCE_MODELS" = true ]; }; then
     echo ""
     echo "[models] Model routing for this project."
@@ -771,42 +978,59 @@ fi
 if [ -n "$LANG_SETS$COMMON_SEL" ]; then
     echo ""
     echo "[rules] installing:${COMMON_SEL:+ common:(${COMMON_SEL# })}${LANG_SETS:+ sets:${LANG_SETS# }}"
-    # The common directory is always copied when anything is selected --
-    # language files reference ../common/ counterparts. Only the SELECTED
-    # files get @-imported, so unselected copies cost zero context.
-    for r in common $LANG_SETS; do
+    # Claude Code loads every .md under .claude/rules/ by itself: files
+    # without "paths:" frontmatter at launch, files with it only when a
+    # matching file is touched (the language sets are path-scoped). So copy
+    # ONLY the selected common files, and write no @-import: an import
+    # would load the same text a second time, and unscoped.
+    mkdir -p "$DEST/rules/common"
+    for c in $COMMON_SEL; do
+        src="$SCRIPT_DIR/rules/common/$c.md"
+        [ -f "$src" ] || { echo "  [skip] rules/common/$c (not found)"; continue; }
+        if [ -f "$DEST/rules/common/$c.md" ]; then echo "  [keep] rules/common/$c"; continue; fi
+        cp "$src" "$DEST/rules/common/$c.md"
+        echo "  [copy] rules/common/$c (loaded every session)"
+    done
+    rmdir "$DEST/rules/common" 2>/dev/null || true
+    for r in $LANG_SETS; do
         src="$SCRIPT_DIR/rules/$r"
         if [ ! -d "$src" ]; then echo "  [skip] rules/$r (not found)"; continue; fi
         if [ -d "$DEST/rules/$r" ]; then echo "  [keep] rules/$r (already exists)"; continue; fi
-        mkdir -p "$DEST/rules"
         cp -r "$src" "$DEST/rules/$r"
-        echo "  [copy] rules/$r"
+        echo "  [copy] rules/$r (loaded only when a matching file is touched)"
     done
-    CMD_FILE="$TARGET/CLAUDE.md"
-    MARK="<!-- blackcat:rules -->"
-    if [ -f "$CMD_FILE" ] && grep -qF "$MARK" "$CMD_FILE"; then
-        echo "  [keep] CLAUDE.md import block (marker already present)"
+fi
+
+# Rules installed before v26.11.4 were ALSO @-imported from CLAUDE.md, and
+# the whole common/ folder was copied even when only some were picked. Both
+# cost context every session: imports duplicated what Claude Code already
+# loads from .claude/rules/, and unpicked common files loaded anyway. Fix it
+# on any run: keep what the import block listed, move unlisted common files
+# to backups, then drop the block.
+RULES_MD="$TARGET/CLAUDE.md"
+if [ -f "$RULES_MD" ] && grep -qF '<!-- blackcat:rules -->' "$RULES_MD"; then
+    _bkr="$DEST/backups/rules-unselected-$(date +%Y%m%d-%H%M%S)"
+    for f in "$DEST"/rules/common/*.md; do
+        [ -f "$f" ] || continue
+        if ! grep -qF "@.claude/rules/common/$(basename "$f")" "$RULES_MD"; then
+            mkdir -p "$_bkr" && mv "$f" "$_bkr/"
+            echo "[rules] common/$(basename "$f") was never selected but loaded anyway -> moved to backups"
+        fi
+    done
+    cp "$RULES_MD" "$RULES_MD.blackcat-bak"
+    awk '
+        /^<!-- blackcat:rules -->$/ {skip=1; next}
+        skip && /^<!-- Coding rules installed by claude_blackcat/ {incomment=1}
+        skip && incomment { if ($0 ~ /-->/) incomment=0; next }
+        skip && /^@\.claude\/rules\// {next}
+        {skip=0; print}
+    ' "$RULES_MD.blackcat-bak" > "$RULES_MD"
+    if grep -q '@\.claude/rules/' "$RULES_MD"; then
+        echo "[rules] could not cleanly remove the import block -- restored CLAUDE.md, remove the @.claude/rules/ lines by hand"
+        mv "$RULES_MD.blackcat-bak" "$RULES_MD"
     else
-        {
-            [ -f "$CMD_FILE" ] && echo ""
-            echo "$MARK"
-            echo "<!-- Coding rules installed by claude_blackcat. Claude Code only"
-            echo "     loads these because they are @-imported below. To drop a rule,"
-            echo "     delete its line; to drop them all, delete this block. -->"
-            for c in $COMMON_SEL; do
-                [ -f "$DEST/rules/common/$c.md" ] && echo "@.claude/rules/common/$c.md"
-            done
-            for r in $LANG_SETS; do
-                [ -d "$DEST/rules/$r" ] || continue
-                for f in "$DEST/rules/$r"/*.md; do
-                    [ -f "$f" ] || continue
-                    base="${f##*/}"
-                    [ "$base" = "README.md" ] && continue
-                    echo "@.claude/rules/$r/$base"
-                done
-            done
-        } >> "$CMD_FILE"
-        echo "  [add] @-import block -> $CMD_FILE"
+        rm -f "$RULES_MD.blackcat-bak"
+        echo "[rules] removed the @-import block from CLAUDE.md (.claude/rules/ loads natively; imports doubled it)"
     fi
 fi
 
@@ -1060,14 +1284,20 @@ fi
 
 UPDATE_LIST=""
 
-for kind in skills rules; do
-    for d in "$DEST/$kind"/*/; do
-        [ -d "$d" ] || continue
-        name="$(basename "$d")"
-        src="$SCRIPT_DIR/$kind/$name"
-        [ -d "$src" ] || continue
-        diff -rq "$src" "$d" >/dev/null 2>&1 || UPDATE_LIST="$UPDATE_LIST $kind/$name"
-    done
+for d in "$DEST/skills"/*/; do
+    [ -d "$d" ] || continue
+    name="$(basename "$d")"
+    src="$SCRIPT_DIR/skills/$name"
+    [ -d "$src" ] || continue
+    diff -rq "$src" "$d" >/dev/null 2>&1 || UPDATE_LIST="$UPDATE_LIST skills/$name"
+done
+# Rules are compared file by file: a project holds only the rule files it
+# picked, so a whole-folder diff would always report (and re-add) the rest.
+for f in "$DEST"/rules/*/*.md; do
+    [ -f "$f" ] || continue
+    rel="rules/$(basename "$(dirname "$f")")/$(basename "$f")"
+    [ -f "$SCRIPT_DIR/$rel" ] || continue
+    cmp -s "$SCRIPT_DIR/$rel" "$f" || UPDATE_LIST="$UPDATE_LIST $rel"
 done
 for kind in commands agents output-styles; do
     for f in "$DEST/$kind"/*.md; do
@@ -1107,9 +1337,6 @@ do_update() {
         fi
     fi
     echo "  [update] $1"
-    case "$1" in rules/*)
-        echo "           (if this set gained NEW files, add their @-import lines to CLAUDE.md manually)" ;;
-    esac
 }
 
 if [ -z "$UPDATE_LIST" ]; then

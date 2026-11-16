@@ -13,8 +13,11 @@ description: MUST BE USED whenever writing or modifying code files in this proje
 
 1. **每完成一個有意義的變更就追加一條**（不是每次存檔都寫；以「一個可驗證的小段落」為單位）。
 2. **只追加、不改寫**歷史條目。
-3. 條目要短——review 靠的是 diff，worklog 只負責「範圍與意圖」。
+3. 條目要短——review 靠的是 diff，worklog 只負責「範圍與意圖」。一條最多 5 行，不貼程式碼、
+   不貼指令的完整輸出（`verify:` 只寫指令和結果摘要，例如「8 passed」）。
 4. 檔案不存在就建立（含 `# Worklog` 標題）。
+5. worklog 只放**還沒提交**的工作。`/commit` 會把它歸檔並清空；超過 150 行還沒提交，
+   代表該審查提交了，提醒使用者跑 `/review-code`，不要繼續往上疊。
 
 ## 條目格式
 
