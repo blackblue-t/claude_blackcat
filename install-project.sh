@@ -78,7 +78,7 @@ PRESET_STYLES="terse plain-language"
 UI_COMMANDS="ui-style ui-add ui-site ui-page pm-choose"
 UI_AGENTS="ui-builder"
 UI_SKILLS="ui-style-compliance package-manager"
-PM_COMMANDS="task-init task-add task-next task-status time-log pm-choose"
+PM_COMMANDS="task-init task-add task-next task-auto task-status time-log pm-choose"
 PM_SKILLS="wbs package-manager"
 
 list_items() {
@@ -140,7 +140,7 @@ REPLY STYLES (installed with every preset; switch in Claude Code with
   --taskmaster     Old TaskMaster hooks. New projects: use --pm instead.
 
 CODING RULES
-  --rules python   Add coding rules (common + the language) to CLAUDE.md.
+  --rules python   Copy coding rules (common + the language) into .claude/rules/.
                    Languages: python, typescript, rust (comma separated).
   --no-rules       Do not ask about rules.
 
@@ -923,9 +923,10 @@ if [ -n "$RULES" ]; then
 elif [ "$NO_RULES" != true ] && [ "$UPDATE_ONLY" != true ] && [ -t 0 ]; then
     # Interactive picker: only when stdin is a terminal.
     echo ""
-    echo "[rules] Coding rules can be @-imported into this project's CLAUDE.md."
-    echo "        Each imported file costs context every session -- pick only what you need."
-    printf "Add coding rules to CLAUDE.md? [y/N] "
+    echo "[rules] Coding rules can be copied into this project's .claude/rules/."
+    echo "        Language sets load only when a matching file is touched; every"
+    echo "        common rule costs context in every session -- pick only what you need."
+    printf "Add coding rules? [y/N] "
     read -r ans || ans=""
     case "$ans" in
         y|Y|yes|YES)
@@ -1267,6 +1268,29 @@ for f in "$DEST"/commands/*.md; do
         echo "[model] $(basename "$f" .md): claude-fable-5 -> fable (alias follows the latest Fable)"
     fi
 done
+
+# Companion commands: newer versions of installed commands call these, and
+# --update alone only refreshes files that already exist. Add the missing
+# ones on any run so an updated /go never points at a file that is absent.
+ensure_cmd() { # $1=command $2=needed by
+    [ -f "$DEST/commands/$1.md" ] && return 0
+    [ -f "$SCRIPT_DIR/commands/$1.md" ] || return 0
+    cp "$SCRIPT_DIR/commands/$1.md" "$DEST/commands/$1.md"
+    echo "[new] commands/$1 (used by $2)"
+    NEW_CMDS="$NEW_CMDS $1"
+}
+NEW_CMDS=""
+if [ -f "$DEST/commands/go.md" ]; then
+    for c in sync next review-deep; do ensure_cmd "$c" /go; done
+fi
+[ -f "$DEST/commands/task-next.md" ] && ensure_cmd task-auto "bcd --loop"
+case " $NEW_CMDS " in *" review-deep "*)
+    if grep -q '^model: fable[[:space:]]*$' "$DEST/commands/review-code.md" 2>/dev/null; then
+        echo "[cost] /review-code runs after every task and is still on fable in this project."
+        echo "       /review-deep (fable) now covers critical tasks; to put the everyday review"
+        echo "       on opus run: blackcat --models balanced"
+    fi ;;
+esac
 
 # Hallmark was fetched by --ui up to v26.10.2. Its rules clash with the
 # chosen brand style and duplicate anti-ai.md, so it is retired: move the

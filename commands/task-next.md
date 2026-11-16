@@ -8,6 +8,11 @@ description: 從 WBS 取下一個可以做的任務（依賴都完成、優先�
 格式與狀態規則以 `wbs` skill 為準。用法：`/task-next`、`/task-next 2.3`（指定）、
 `/task-next --parallel`（找可並行的一批）。
 
+## 步驟 0：同步
+
+照 `sync.md` 的步驟 1、2 做一次（沒有遠端就跳過）：WBS 是進 git 的，別台電腦或別人可能已經
+改過狀態，先拉下來再選任務。
+
 ## 步驟 1：接續檢查
 
 `.claude/taskmaster-data/.current-task` 有值，且那一列還是 `進行中` → 先問：
@@ -37,6 +42,9 @@ description: 從 WBS 取下一個可以做的任務（依賴都完成、優先�
 | 需求還模糊 | 先 `/grill`，計畫一樣帶 `wbs:` |
 
 `/commit` 會看計畫或任務檔的 `wbs:`，提交後自動把那一列改 `完成`、清掉 `.current-task`。
+
+做完一個任務，提醒使用者 **`/clear` 再取下一個**。想放著讓它一個接一個做，在終端機跑
+`bcd --loop`（每個任務一個全新 session，見 `dispatch.md`）。
 
 ## --parallel：一批並行
 

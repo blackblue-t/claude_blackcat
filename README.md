@@ -1,8 +1,10 @@
 # claude_blackcat
 
-**版本：v26.11.3**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
+**版本：v26.11.4**（版號規則：`v年.月.當月第幾版`，年取西元後兩碼）
 
-個人 Claude Code 設定同步 repo。全域偏好跟人走（只有 settings + statusline），工作流跟專案走。思想來源與取捨見 [WORKFLOW.md](WORKFLOW.md)。
+個人 Claude Code 設定同步 repo。全域偏好跟人走，工作流跟專案走。**第一次用、或忘記該打哪個指令，先看 [WORKFLOW.md](WORKFLOW.md)（一頁版使用指南）**；這份 README 是完整說明書。
+
+最常用的三個入口：`/next`（不知道現在該做什麼）、`/go <需求>`（做一件事）、`/task-init` → `/task-next`（管一整個專案）。token 用很兇時跑 `blackcat --doctor`。
 
 ```
 全域（~/.claude/）：settings + statusline + 註記寫法 + 命名規則 + UI 風格庫 + cat 指令 ← 偏好，跟人走
@@ -51,10 +53,13 @@ blackcat --no-rules   :: 跳過規範選單（CI / 腳本用；非互動環境�
 blackcat --ui         :: 加裝前端包（風格庫選風格、/ui-style /ui-site /ui-page、截圖驗收）
 blackcat --pm         :: 加裝專案管理包（WBS、/task-next、自動時間紀錄、套件管理器選擇）
 blackcat --taskmaster :: 加裝 TaskMaster
+blackcat --doctor     :: 體檢：每個 session 一開始載入多少東西、哪些檔案在變大、每個指令用哪個模型、git 狀態（只讀）
+blackcat --models balanced :: 一鍵設定模型：save（全部降一級）／balanced（預設）／max（全部最強）；不帶參數是逐項挑
 blackcat --update     :: 純更新模式：blackcat repo 更新後，刷新專案裡已裝且有變動的項目
 blackcat --usage      :: 用量統計：這個專案的 skills/commands/agents 各用過幾次、哪些裝了沒用過（別名 --skill-freq）
 blackcat --graphify   :: 加裝 Graphify 知識圖譜（實驗性，實測沒幫助，見下方說明）
 blackcat --graphify-remove :: 從專案拆掉 Graphify
+bcd --loop            :: 照 WBS 一個任務一個全新 session 連續做（預設最多 5 個，--budget 設每個任務花費上限）
 bcd                   :: 並行任務調度（blackcat-dispatch 的短別名；Claude Code 裡用 /dispatch）
 blackcat --help       :: 每個選項的說明（英文，Windows 主控台顯示中文會亂碼）
 blackcat --list       :: 列出所有可單獨挑選的項目名稱
@@ -81,7 +86,21 @@ blackcat --skills django-tdd --agents python-reviewer   :: 手動指定
 
 ### 模型路由
 
-三段分工：**規劃/審查用 Fable 5、執行用 Opus、機械收尾用 Sonnet**。
+分工原則：**花費跟風險成正比**。只做一次的思考（需求、規格、WBS、計畫）用 Fable；每個任務都會跑的審查預設用 Opus，只有關鍵任務才用 Fable；執行用 Opus；機械收尾用 Sonnet。
+
+| 路線 | 指令 | `balanced`（預設） | `save` | `max` |
+|:--|:--|:--|:--|:--|
+| 一次性的思考 | /grill /grill-doc /spec /task-init /plan | fable | opus | fable |
+| 每個任務的審查 | /review-code | opus | sonnet | fable |
+| 關鍵任務的審查 | /review-deep | fable | opus | fable |
+| 主迴圈（執行） | /go /task-next 等沒寫 model 的 | 不動（全域預設 opus） | sonnet | 不動 |
+| 機械收尾 | /commit /sync /next /verify 等 | sonnet | sonnet | sonnet |
+
+`blackcat --models save|balanced|max` 一次設定整個專案。每百萬 token 的價格（輸入／輸出，2026-11）：fable 8／40、opus 4／20、sonnet 2／10 美元。
+
+`/go` 開頭會判任務等級：**快車道**（小改，不開審查）、**一般**（`/review-code`）、**關鍵**（登入權限、金流、資料遷移、刪資料、對外介面、並行 → `/review-deep`），並用一句話告訴你，你可以改。模型一律寫別名（`fable`、`opus`、`sonnet`），會自動跟著最新版；舊版寫死的 `claude-fable-5` 比現行版本貴，`blackcat --update` 會自動改掉。
+
+**換模型有隱藏成本**：指令的 `model:` 跟當下 session 的模型不同時，那一輪整段對話要重讀、沒有快取折扣（官方文件的說法）。所以 `/grill`、`/plan`、`/task-init` 這類指令在新 session 或 `/clear` 後跑最省；`/go` 內部的計畫與提交都用主迴圈模型、審查開在獨立 session，不會踩到這個問題。
 
 **初始化精靈**：專案**第一次**安裝時（模型路由指令剛被複製進去），安裝器會自動跑模型設定精靈——先用 claude CLI 探測 `fable` 是否可用（一次極小的 API 呼叫；不可用時 plan/review 預設自動降為 opus），然後逐階段詢問 plan / review / commit / 主迴圈各用哪個模型（Enter 保留預設、可輸入 1-4 或完整模型 ID）。選擇寫進**該專案的**指令副本與 `.claude/settings.json`，所以每個專案可以路由不同。重跑不會再問；想改用 `blackcat --models` 重開精靈。專案自選的模型受更新機制保護：比對時忽略 model 行、更新時保留專案的選擇。
 
@@ -270,6 +289,17 @@ bcd --clean         # 移除 worktree、刪已合併分支
 - `blackcat --graphify`：裝上（需先 `uv tool install graphifyy`）。只建議用在**超大、單一語言、靠 import 串起來**的程式庫，裝完過一兩週用 `blackcat --usage` 看實際有沒有被查詢。
 - `blackcat --graphify-remove`：拆掉。呼叫 graphify 自己的移除指令（只限這個專案，不動全域），移掉 skill、CLAUDE.md 的 graphify 段落、settings.json 的 hook、git 的 post-commit／post-checkout 區段；`graphify-out/` 會先告訴你大小，問過才刪。
 
+### 同步與連續開發
+
+**同步（`/sync`）**：v26.11.3 以前整套流程沒有任何一步跟遠端同步，多台電腦或多人時必然分岔。現在 `/go` 開工前先 `git fetch`，落後就拉、分岔就把還沒推過的本地提交 rebase 上去，衝突停下來協助解；`/commit` 收尾再同步一次並依 `.claude/blackcat.conf` 的 `PUSH` 處理推送（`ask` 預設問一句、`auto` 直接推、`never` 只提醒）。不用 `--force`，不替你 stash。
+
+**連續開發（`bcd --loop`）**：照 WBS 一次做一個任務，每個任務開一個全新的 headless session 跑 `/task-auto`（選任務 → 計畫 → 實作 → 驗證 → 審查 → 提交 → 更新 WBS），做完寫一行狀態，迴圈再開下一個。context 不累積，所以不會越做越貴。
+
+- 在 `main`／`master` 上執行會自動開 `auto/<時間>` 分支，主分支不動；做完印出合併與丟棄的指令。上次的 `auto/*` 還沒合併時會拒絕再開新的，避免重做。
+- 停止條件：`COMPLETE`（做完了）、`BLOCKED`（需求不明、同一個錯修三次還紅、審查沒過；沒做完的變更收進 `git stash`，WBS 標阻塞）、`NEEDS_HUMAN`（關鍵等級的任務要你確認計畫）、到達上限（預設 5，`bcd --loop 10`）、任務說完成卻留下未提交檔案。
+- `--budget 3`（或 conf 的 `LOOP_BUDGET_USD`）用 Claude Code 的 `--max-budget-usd` 限制每個任務的花費；`--dry-run` 只預覽。
+- 需要 `--pm`（WBS）。不 push。工作區不乾淨時拒絕啟動。
+
 ### 專案管理：`--pm`
 
 ```
@@ -294,7 +324,7 @@ bcd --clean         # 移除 worktree、刪已合併分支
 - **每次跑 `blackcat`**（任何 preset）結尾都會做更新檢查：比對專案已裝項目與 repo 版本，列出有差異的（skills / rules / commands / agents / output-styles），互動模式下**詢問要更新哪些**（`a` 全更、Enter 跳過、輸入編號挑選）。
 - **`blackcat --update`**：純更新模式——不裝任何新東西，直接刷新所有有差異的項目、不逐項詢問。這是「更新 blackcat repo → 到各專案跑一次」的標準流程。
 - 更新會**覆蓋該項目的本地修改**（提示訊息會先警告），所以專案的 `.claude/` 記得先 commit；非互動環境（CI）只列差異不動手。
-- 小提醒：rules 組合若新增了「新檔案」，更新會複製進來但 CLAUDE.md 的 `@import` 區塊不會自動加行（那是你挑選過的清單），輸出會提示手動補。
+- rules 逐檔比對：專案只會有你挑過的規範檔，更新只刷新已存在的檔，不會把沒挑的加回來。
 
 ---
 
@@ -385,7 +415,7 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 ---
 
-## Commands 詳解（30 個）
+## Commands 詳解（34 個）
 
 ### 核心五個（presets 內含）
 
@@ -394,7 +424,10 @@ bcd --clean         # 移除 worktree、刪已合併分支
 | `/plan` | 規劃並持久化（見上）。`--adhoc` 建立不綁任務的臨時計畫 |
 | `/tdd` | 讀取 active 計畫接續 TDD；無計畫且任務不小（≥2 檔或 ≥1h）會建議先 `/plan` |
 | `/verify` | 全面驗證。參數：`quick`（建置+型別）/ `full`（預設）/ `pre-commit` / `pre-pr` |
-| `/review-code` | 正確性導向的程式碼審查（品質、安全、架構）；跟 `/ponytail-review` 互補 |
+| `/review-code` | 一般任務的審查（opus）：內建 code-review＋規格收斂、文件債、命名、測試品質；跟 `/ponytail-review` 互補 |
+| `/review-deep` | 關鍵任務的深度審查（fable、強度升一級，多查「出問題怎麼退回」）；`/go` 判定為關鍵時自動改跑 |
+| `/next` | 讀專案狀態，只告訴你下一步該打什麼（不動檔案） |
+| `/sync` | 跟遠端同步：開工前拉、收工後推，處理落後、分岔、衝突；`/sync push`、`/sync status` |
 | `/save-session` | session 存檔（見上） |
 
 ### 流程站（presets 內含，說明見上方各節）
@@ -412,6 +445,7 @@ bcd --clean         # 移除 worktree、刪已合併分支
 | `/task-init` | 收斂需求後拆 WBS |
 | `/task-add` | 追加任務或里程碑 |
 | `/task-next` | 取下一個任務並開始計時；`--parallel` 找一批可並行的 |
+| `/task-auto` | 無人值守做一個 WBS 任務，給 `bcd --loop` 呼叫用，不是手動打的 |
 | `/task-status` | 進度、預估對實際、目標日風險、歸檔 |
 | `/time-log` | 按日、按任務的時間與費用 |
 | `/pm-choose` | 選或切換套件管理器 |
@@ -457,12 +491,12 @@ bcd --clean         # 移除 worktree、刪已合併分支
 
 **Hooks**：v26.7.3 起全域**零 hooks**；專案層只有 preset 附的坑閘門（有教訓檔才有作用）與 `/session` 登記時加的看板 hook。agent-monitor 移至 project-template（`--taskmaster` 時隨專案安裝）；舊版 25+ 個 ECC hooks 已於 v26.7.1 移除。回滾看 git history。
 
-**Rules**：24 個編碼規範文件（common 9 + python/typescript/rust 各 5）。注意 **Claude Code 不會自動載入 rules 目錄**——安裝器會把規範複製進專案 `.claude/rules/` 並在專案 CLAUDE.md 附加一段帶標記的 `@import` 區塊（原生 memory import 機制），這才是規範真正進入 startup prompt 的接線。重跑不會重複附加；每個 import 的檔案都吃 context，按專案需要選裝。
+**Rules**：24 個編碼規範文件（common 9 + python/typescript/rust 各 5）。Claude Code 會自己載入專案的 `.claude/rules/`：沒有 `paths:` 的檔案每個 session 都載入，有 `paths:` 的只在碰到符合的檔案時才載入（三個語言組合都有設，例如 Python 規範只在讀寫 `.py` 時出現）。所以安裝器只複製你挑的檔案，**不再往 CLAUDE.md 寫 `@import`**——v26.11.3 以前會寫，等於同一份規範載入兩次，而且沒挑的 common 規範也被載入；任何一次 `blackcat`（含 `--update`）會自動移除舊的 import 區塊，並把當初沒挑的 common 檔搬到 `.claude/backups/`。common 規範每個 session 都佔位，按需要挑，不要全裝。
 
 裝法有兩種：跑 `blackcat --lean`（或任何 preset）結尾會出現**互動選單**，先問要不要裝（Enter = 不裝），要裝的話列出語言組合與 9 條 common 規範各附一句說明，輸入編號挑選（common 直接 Enter = 全裝、`n` = 不裝）；或用 `--rules python` 直接指定跳過選單。選單只在互動終端機出現，CI / 管線自動靜默跳過，也可用 `--no-rules` 強制關閉：
 
 ```
-Add coding rules to CLAUDE.md? [y/N] y
+Add coding rules? [y/N] y
 Language sets (a set imports all 5 of its files):
   1) python       Python set: style/testing/patterns/hooks/security
   2) rust         Rust set: style/testing/patterns/hooks/security
@@ -513,6 +547,7 @@ Select common rules (Enter for all, n for none, numbers to pick): 2 9
 
 | 版本 | 日期 | 內容 |
 |:--|:--|:--|
+| **v26.11.4** | 2026-11-16 | 專案體檢後的一批修正。**花費**：/review-code 預設改 opus＋medium，新增 /review-deep（fable）只給關鍵任務，/go 判三級；`blackcat --models save\|balanced\|max` 一鍵設定；`blackcat --doctor` 體檢。**同步**：新增 /sync，/go 開工前拉、/commit 收尾問推送（`PUSH=ask\|auto\|never`）。**連續開發**：`bcd --loop` 一個任務一個全新 session，/task-auto。**記憶**：rules 不再 @import（原本載入兩次、沒挑的也載入），自動移轉；看板 hook 上限 40 行、session 存檔 60 行留 10 份、worklog 與教訓加上限。**使用**：新增 /next；WORKFLOW.md 重寫成一頁版指南 |
 | **v26.11.3** | 2026-11-16 | 模型路由改用別名 `fable`：原本寫死的 `claude-fable-5` 是第一代，比現行版本貴而且不會跟著升級；任何一次 `blackcat`（含 `--update`）會把專案裡的舊值改成別名，其他自選的模型不動 |
 | **v26.11.2** | 2026-11-09 | 修 `scripts/check-counts.sh` 從未進版控（`.gitignore` 早期的 `scripts/` 規則擋掉，環境重開就消失）：規則改成只擋根目錄的 ECC 資料夾，腳本重建並加一項檢查「README 指到的檔案不能被 gitignore」 |
 | **v26.11.1** | 2026-11-09 | Graphify 降為實驗性：不再於首次安裝時詢問（實測 583 次提醒 0 次查詢、grep 較準、graphify-out 411 MB）；新增 `blackcat --graphify-remove` 從專案乾淨拆掉（skill、CLAUDE.md 段落、hook、git hook，graphify-out 問過才刪） |

@@ -15,10 +15,15 @@
 #   blackcat-dispatch --status        # show task/branch states
 #   blackcat-dispatch --merge         # merge finished task branches into current branch
 #   blackcat-dispatch --clean         # remove merged worktrees + branches
+#   blackcat-dispatch --loop [N]      # work through the WBS one task at a time,
+#                                     # a FRESH session per task, at most N tasks
+#                                     # (default 5). Add --budget 3 to cap each
+#                                     # task at about 3 USD. --dry-run previews.
 #
 # Config (.claude/dispatch.conf, shell syntax):
 #   MAX_PARALLEL=2            # max concurrent sessions (default 2)
 #   DISPATCH_MODEL=opus       # default model for task sessions
+#   LOOP_BUDGET_USD=          # --loop: spend cap per task session (empty = none)
 #   DISPATCH_WINDOW=0         # 1 (or --windows): open each task in a real
 #                             # terminal window titled "bc-<slug>" so you can
 #                             # watch sessions live without mixing them up;
@@ -60,6 +65,8 @@ MAX_PARALLEL=2
 DISPATCH_MODEL="opus"
 DISPATCH_PERMISSIONS="skip"
 DISPATCH_WINDOW=0
+LOOP_MAX=5
+LOOP_BUDGET_USD=""
 [ -f "$CONF" ] && . "$CONF"
 
 MODE="run"
@@ -76,7 +83,10 @@ while [ $# -gt 0 ]; do
         --status) MODE="status" ;;
         --merge) MODE="merge" ;;
         --clean) MODE="clean" ;;
-        -h|--help) sed -n '3,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --loop) MODE="loop"
+            case "${2:-}" in ''|*[!0-9]*) ;; *) LOOP_MAX="$2"; shift ;; esac ;;
+        --budget) LOOP_BUDGET_USD="$2"; shift ;;
+        -h|--help) sed -n '3,45p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "[error] unknown option: $1"; exit 1 ;;
     esac
     shift
@@ -198,6 +208,113 @@ if [ "$MODE" = "clean" ]; then
 fi
 
 # ------------------------------------------------------------------- run ----
+# ------------------------------------------------------------------ loop ----
+# Sequential, unattended: one WBS task per FRESH headless session, so no
+# context carries over and each task pays only for itself. State lives in
+# files (WBS, plan, worklog archive), never in a conversation. The session
+# runs /task-auto, which handles exactly one task and ends by writing one
+# line to the status file:
+#   DONE <id>         task committed, go on
+#   COMPLETE          no pending task left
+#   BLOCKED <id> ...  cannot proceed (missing info, failing checks, review escalated)
+#   NEEDS_HUMAN <id>  critical-level task: a person must approve the plan
+# Anything except DONE stops the loop. Nothing is pushed.
+if [ "$MODE" = "loop" ]; then
+    WBS="$PROJ/.claude/taskmaster-data/wbs.md"
+    STATUS_FILE="$LOG_DIR/loop-status"
+    [ -f "$WBS" ] || { echo "[loop] no WBS at .claude/taskmaster-data/wbs.md -- run /task-init first"; exit 1; }
+    [ -f "$PROJ/.claude/commands/task-auto.md" ] || {
+        echo "[loop] /task-auto is not installed here -- run: blackcat --pm"; exit 1; }
+    if [ -n "$(git -C "$PROJ" status --porcelain)" ]; then
+        echo "[loop] working tree is not clean. Commit or put away these first:"
+        git -C "$PROJ" status --short | sed 's/^/    /'
+        exit 1
+    fi
+    echo "[loop] up to $LOOP_MAX task(s), model $DISPATCH_MODEL, budget per task: ${LOOP_BUDGET_USD:-none}"
+    if [ "$DRY" = true ]; then
+        echo "[dry-run] would run /task-auto in a fresh session up to $LOOP_MAX time(s); nothing launched"
+        exit 0
+    fi
+    command -v claude >/dev/null 2>&1 || { echo "[error] claude CLI not found"; exit 1; }
+    START_BRANCH="$BASE_BRANCH"
+    case "$BASE_BRANCH" in
+        main|master)
+            # An earlier run left work that was never merged: starting a new
+            # branch from here would redo those tasks on top of old code.
+            OPEN_AUTO="$(git -C "$PROJ" branch --no-merged HEAD --list 'auto/*' --format='%(refname:short)' | head -1)"
+            if [ -n "$OPEN_AUTO" ]; then
+                echo "[loop] branch $OPEN_AUTO from an earlier run is not merged into $BASE_BRANCH yet. Pick one:"
+                echo "    keep going on it:   git switch $OPEN_AUTO   then run bcd --loop again"
+                echo "    accept its work:    git merge --no-ff $OPEN_AUTO"
+                echo "    throw it away:      git branch -D $OPEN_AUTO"
+                exit 1
+            fi
+            LOOP_BRANCH="auto/$(date +%Y%m%d-%H%M%S)"
+            git -C "$PROJ" show-ref --verify --quiet "refs/heads/$LOOP_BRANCH" && LOOP_BRANCH="$LOOP_BRANCH-$$"
+            git -C "$PROJ" switch -q -c "$LOOP_BRANCH"
+            echo "[loop] on $START_BRANCH -> working on new branch $LOOP_BRANCH ($START_BRANCH stays untouched)" ;;
+        *)  LOOP_BRANCH="$BASE_BRANCH"
+            echo "[loop] working on current branch $LOOP_BRANCH" ;;
+    esac
+    # Logs and the status file must never make the tree look dirty.
+    mkdir -p "$LOG_DIR"
+    [ -f "$LOG_DIR/.gitignore" ] || echo '*' > "$LOG_DIR/.gitignore"
+    START_SHA="$(git -C "$PROJ" rev-parse HEAD)"
+    BUDGET_FLAG=""
+    [ -n "$LOOP_BUDGET_USD" ] && BUDGET_FLAG="--max-budget-usd $LOOP_BUDGET_USD"
+    if [ "$DISPATCH_PERMISSIONS" = "acceptEdits" ]; then
+        LOOP_PERM="--permission-mode acceptEdits"
+    else
+        LOOP_PERM="--dangerously-skip-permissions"
+    fi
+    STAMP="$(date +%Y%m%d-%H%M%S)"
+    i=0; done_n=0; LAST="none"
+    while [ "$i" -lt "$LOOP_MAX" ]; do
+        i=$((i+1))
+        rm -f "$STATUS_FILE"
+        LOG="$LOG_DIR/loop-$STAMP-$i.log"
+        echo "[loop $i/$LOOP_MAX] starting a fresh session (log: ${LOG#$PROJ/})"
+        ( cd "$PROJ" && claude -p "/task-auto" --model "$DISPATCH_MODEL" $LOOP_PERM $BUDGET_FLAG ) > "$LOG" 2>&1 || true
+        LAST="$(head -1 "$STATUS_FILE" 2>/dev/null | tr -d '\r')"
+        [ -n "$LAST" ] || LAST="NO_STATUS (session ended without reporting -- see the log)"
+        echo "[loop $i/$LOOP_MAX] $LAST"
+        case "$LAST" in
+            DONE*)
+                if [ -n "$(git -C "$PROJ" status --porcelain)" ]; then
+                    LAST="STOPPED: task reported DONE but left uncommitted files"
+                    echo "[loop] $LAST"; break
+                fi
+                done_n=$((done_n+1)) ;;
+            *) break ;;
+        esac
+    done
+    echo ""
+    echo "[loop] finished: $done_n task(s) done in $i session(s). Last status: $LAST"
+    NEW="$(git -C "$PROJ" log --oneline "$START_SHA..HEAD" 2>/dev/null)"
+    if [ -n "$NEW" ]; then
+        echo "[loop] new commits on $LOOP_BRANCH:"
+        echo "$NEW" | sed 's/^/    /'
+        if [ "$LOOP_BRANCH" != "$START_BRANCH" ]; then
+            echo "[next] look at them, then:  git switch $START_BRANCH && git merge --no-ff $LOOP_BRANCH"
+            echo "       to throw them away:  git switch $START_BRANCH && git branch -D $LOOP_BRANCH"
+        fi
+        echo "       nothing was pushed."
+    else
+        echo "[loop] no new commits."
+        if [ "$LOOP_BRANCH" != "$START_BRANCH" ] && [ -z "$(git -C "$PROJ" status --porcelain)" ]; then
+            git -C "$PROJ" switch -q "$START_BRANCH" && git -C "$PROJ" branch -q -d "$LOOP_BRANCH" \
+                && echo "[loop] removed empty branch $LOOP_BRANCH, back on $START_BRANCH"
+        fi
+    fi
+    case "$LAST" in
+        DONE*)      echo "[next] reached the $LOOP_MAX-task limit. Run again to continue: bcd --loop" ;;
+        COMPLETE*)  echo "[next] WBS has no pending task left. In Claude Code: /task-status" ;;
+        NEEDS_HUMAN*) echo "[next] that task is critical-level: open Claude Code and run /task-next so you approve its plan" ;;
+        *)          echo "[next] open Claude Code and run /next -- it reads the state and tells you what to fix" ;;
+    esac
+    exit 0
+fi
+
 command -v claude >/dev/null 2>&1 || {
     echo "[error] claude CLI not found on PATH"; exit 1; }
 

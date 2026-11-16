@@ -72,3 +72,22 @@ model: sonnet
 - 不改任務檔內容（那是 /plan 的產出）；任務不對就回去改計畫重新匯出。
 - 不代替使用者做「要不要執行」的決定；dry-run 確認是必經步驟。
 - 不 push、不動 worktree 內部——一切透過 blackcat-dispatch 操作。
+
+## 連續模式：`bcd --loop`
+
+跟上面的並行派工是兩回事：並行是「同時做好幾個互不相干的任務檔」，連續是「照 WBS 一個接
+一個做」。使用者說「讓它自己一直做」「跑整個里程碑」時用這個。
+
+```bash
+blackcat-dispatch --loop --dry-run       # 預覽
+blackcat-dispatch --loop                 # 最多 5 個任務
+blackcat-dispatch --loop 10 --budget 3   # 最多 10 個，每個任務約 3 美元上限
+```
+
+- 每個任務一個全新的 headless session 跑 `/task-auto`，做完寫狀態到
+  `.claude/dispatch-logs/loop-status`，不是 `DONE` 就停。
+- 在主分支上會自動開 `auto/<時間>` 分支。跑完把結果摘要給使用者：做完幾個、停在哪、
+  新的 commit 清單，以及它印出的合併或丟棄指令。**不要替使用者合併或刪分支。**
+- 停在 `BLOCKED`／`NEEDS_HUMAN` 時，讀 WBS 的風險表和最後一份 log 的結尾，說明原因。
+- 啟動前先確認工作區乾淨、已經 `/sync`。背景執行，定期回報進度。
+
